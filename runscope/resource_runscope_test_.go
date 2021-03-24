@@ -18,6 +18,19 @@ func resourceRunscopeTest() *schema.Resource {
 		Read:   resourceTestRead,
 		Update: resourceTestUpdate,
 		Delete: resourceTestDelete,
+		Importer: &schema.ResourceImporter{
+			State: func(d *schema.ResourceData, meta interface{}) ([]*schema.ResourceData, error) {
+				parts := strings.SplitN(d.Id(), "/", 2)
+				if len(parts) < 2 {
+					return nil, fmt.Errorf("test ID for import should be in format bucket_id/test_id")
+				}
+
+				d.Set("bucket_id", parts[0])
+				d.SetId(parts[1])
+
+				return []*schema.ResourceData{d}, nil
+			},
+		},
 
 		Schema: map[string]*schema.Schema{
 			"bucket_id": {

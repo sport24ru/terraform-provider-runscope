@@ -45,3 +45,11 @@ The following attributes are exported:
 * `id` - The unique identifier for the test.
 * `name` - The name of this test.
 * `description` - Human-readable description of the new test.
+
+## Import
+
+Test can be imported using the bucket ID and the test UUID, e.g.
+
+```
+$ terraform import runscope_test.example t2f4bkvnggcx/ea37dff1-36e1-44ae-aa7e-48693f235660
+```
