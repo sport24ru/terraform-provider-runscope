@@ -51,7 +51,7 @@ resource "runscope_step" "main_page" {
   }
   before_scripts = [<<EOF
        var endVar = new Date();
-       var startVar = new Date(); 
+       var startVar = new Date();
        alert('this is a multi-line before script')
     EOF
   ]
@@ -178,3 +178,17 @@ The `headers` list supports the following:
 The following attributes are exported:
 
 * `id` - The ID of the step.
+
+## Import
+
+Test can be imported using the bucket ID, test ID and step ID e.g.
+
+```
+$ terraform import runscope_test.example t2f4bkvnggcx/ea37dff1-36e1-44ae-aa7e-48693f235660/ad41345e-8874-4bcd-904a-d85901239789
+```
+
+or you may use position of step in test (starting from 1) e.g.
+
+```
+$ terraform import runscope_test.example t2f4bkvnggcx/ea37dff1-36e1-44ae-aa7e-48693f235660#1
+```

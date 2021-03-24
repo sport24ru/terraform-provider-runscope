@@ -3,6 +3,7 @@ package runscope
 import (
 	"fmt"
 	"log"
+	"strconv"
 	"strings"
 
 	runscope "github.com/ewilde/go-runscope"
@@ -15,6 +16,62 @@ func resourceRunscopeStep() *schema.Resource {
 		Read:   resourceStepRead,
 		Update: resourceStepUpdate,
 		Delete: resourceStepDelete,
+		Importer: &schema.ResourceImporter{
+			State: func(d *schema.ResourceData, meta interface{}) ([]*schema.ResourceData, error) {
+				parts := strings.Split(d.Id(), "/")
+
+				bucketId := parts[0]
+				d.Set("bucket_id", bucketId)
+
+				if len(parts) == 3 {
+					d.Set("test_id", parts[1])
+					d.SetId(parts[2])
+					return []*schema.ResourceData{d}, nil
+				}
+
+				if len(parts) != 2 {
+					return nil, fmt.Errorf("step ID for import should be in format bucket_id/test_id/step_id " +
+						"or bucket_id/test_id#step_position")
+				}
+
+				parts = strings.Split(parts[1], "#")
+				if len(parts) != 2 {
+					return nil, fmt.Errorf("step ID for import should be in format bucket_id/test_id/step_id " +
+						"or bucket_id/test_id#step_position")
+				}
+
+				stepPos, err := strconv.Atoi(parts[1])
+				if err != nil || stepPos < 1 {
+					return nil, fmt.Errorf("step_position should be a positive integer number")
+				}
+
+				testId := parts[0]
+				d.Set("test_id", testId)
+
+				test := &runscope.Test{
+					ID: testId,
+					Bucket: &runscope.Bucket{
+						Key: bucketId,
+					},
+				}
+
+				client := meta.(*runscope.Client)
+
+				test, err = client.ReadTest(test)
+				if err != nil {
+					return nil, err
+				}
+
+				nSteps := len(test.Steps)
+				if nSteps < stepPos {
+					return nil, fmt.Errorf("test %s contains only %d steps", testId, nSteps)
+				}
+
+				d.SetId(test.Steps[stepPos-1].ID)
+
+				return []*schema.ResourceData{d}, nil
+			},
+		},
 		Schema: map[string]*schema.Schema{
 			"bucket_id": {
 				Type:     schema.TypeString,
