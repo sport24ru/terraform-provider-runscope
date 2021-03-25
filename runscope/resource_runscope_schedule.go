@@ -88,7 +88,7 @@ func resourceScheduleRead(d *schema.ResourceData, meta interface{}) error {
 	d.Set("bucket_id", bucketID)
 	d.Set("test_id", testID)
 	d.Set("environment_id", schedule.EnvironmentID)
-	d.Set("interval", schedule.Interval)
+	d.Set("interval", strings.ReplaceAll(schedule.Interval, ".0", ""))
 	d.Set("note", schedule.Note)
 	return nil
 }
