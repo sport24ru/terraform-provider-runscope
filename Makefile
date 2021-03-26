@@ -24,7 +24,7 @@ build-gox: deps goimportscheck vet
 	-output="pkg/{{.OS}}_{{.Arch}}/terraform-provider-runscope" .
 
 release:
-	GO111MODULE=off go get github.com/goreleaser/goreleaser; \
+	[ -x `which goreleaser` ] || GO111MODULE=off go get github.com/goreleaser/goreleaser; \
 	goreleaser; \
 
 deps:
@@ -32,7 +32,7 @@ deps:
 
 clean:
 	rm -rf pkg/
-	
+
 fmt:
 	gofmt -w $(GOFMT_FILES)
 
@@ -66,7 +66,7 @@ lint:
 		echo "and fix them if necessary before submitting the code for review."; \
 		exit 1; \
 	fi
-	
+
 test-compile:
 	@if [ "$(TEST)" = "./..." ]; then \
 		echo "ERROR: Set TEST to a specific package. For example,"; \
