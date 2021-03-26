@@ -1,4 +1,16 @@
-## 0.7.0 (Unreleased)
+## 0.8.0 (Unreleased)
+
+## 0.7.0 (March 27, 2021)
+
+ENHANCEMENTS:
+
+* Added import of `runscope_test` resource.
+* Added import of `runscope_step` resource.
+
+BUG FIXES:
+
+* Fixed issue with fractional schedule interval.
+
 ## 0.6.0 (June 30, 2019)
 
 NOTES:
