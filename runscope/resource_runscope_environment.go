@@ -6,11 +6,9 @@ import (
 	"log"
 	"strings"
 
-	"github.com/hashicorp/terraform/helper/hashcode"
-
-	runscope "github.com/ewilde/go-runscope"
-	"github.com/hashicorp/terraform/helper/schema"
-	"github.com/hashicorp/terraform/helper/validation"
+	"github.com/ewilde/go-runscope"
+	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
+	"github.com/hashicorp/terraform-plugin-sdk/helper/validation"
 )
 
 func resourceRunscopeEnvironment() *schema.Resource {
@@ -445,5 +443,5 @@ func recipientsHash(v interface{}) int {
 	buf.WriteString(fmt.Sprintf("%s-", m["name"].(string)))
 	buf.WriteString(fmt.Sprintf("%s-", m["id"].(string)))
 	buf.WriteString(fmt.Sprintf("%s-", m["email"].(string)))
-	return hashcode.String(buf.String())
+	return schema.HashString(buf.String())
 }

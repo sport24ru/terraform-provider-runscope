@@ -5,9 +5,9 @@ import (
 	"os"
 	"testing"
 
-	runscope "github.com/ewilde/go-runscope"
-	"github.com/hashicorp/terraform/helper/resource"
-	"github.com/hashicorp/terraform/terraform"
+	"github.com/ewilde/go-runscope"
+	"github.com/hashicorp/terraform-plugin-sdk/helper/resource"
+	"github.com/hashicorp/terraform-plugin-sdk/terraform"
 )
 
 func TestAccStep_basic(t *testing.T) {
@@ -258,7 +258,7 @@ resource "runscope_step" "main_page" {
   	   source   = "response_header"
   	   property = "Content-Encoding"
   	}
-  
+
   assertions {
   	   source     = "response_status"
            comparison = "equal_number"
@@ -270,7 +270,7 @@ resource "runscope_step" "main_page" {
            value      = "c5baeb4a-2379-478a-9cda-1b671de77cf9"
            property   = "data.id"
   	}
-  
+
   headers 	{
   		header = "Accept-Encoding"
   		value  = "application/json"
@@ -283,7 +283,7 @@ resource "runscope_step" "main_page" {
   		header = "Authorization"
   		value  = "Bearer bb74fe7b-b9f2-48bd-9445-bdc60e1edc6a"
 	}
-  
+
 
   auth {
 	username  = "user"

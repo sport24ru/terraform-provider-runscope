@@ -5,9 +5,9 @@ import (
 	"os"
 	"testing"
 
-	runscope "github.com/ewilde/go-runscope"
-	"github.com/hashicorp/terraform/helper/resource"
-	"github.com/hashicorp/terraform/terraform"
+	"github.com/ewilde/go-runscope"
+	"github.com/hashicorp/terraform-plugin-sdk/helper/resource"
+	"github.com/hashicorp/terraform-plugin-sdk/terraform"
 )
 
 func TestAccTest_basic(t *testing.T) {

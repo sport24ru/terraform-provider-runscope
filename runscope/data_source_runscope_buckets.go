@@ -4,8 +4,8 @@ import (
 	"log"
 	"time"
 
-	runscope "github.com/ewilde/go-runscope"
-	"github.com/hashicorp/terraform/helper/schema"
+	"github.com/ewilde/go-runscope"
+	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
 )
 
 func dataSourceRunscopeBuckets() *schema.Resource {

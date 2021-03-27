@@ -5,7 +5,7 @@ import (
 	"log"
 	"strings"
 
-	runscope "github.com/ewilde/go-runscope"
+	"github.com/ewilde/go-runscope"
 )
 
 // Config contains runscope provider settings

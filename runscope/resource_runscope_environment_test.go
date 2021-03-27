@@ -6,9 +6,9 @@ import (
 	"strings"
 	"testing"
 
-	runscope "github.com/ewilde/go-runscope"
-	"github.com/hashicorp/terraform/helper/resource"
-	"github.com/hashicorp/terraform/terraform"
+	"github.com/ewilde/go-runscope"
+	"github.com/hashicorp/terraform-plugin-sdk/helper/resource"
+	"github.com/hashicorp/terraform-plugin-sdk/terraform"
 )
 
 func TestAccEnvironment_basic(t *testing.T) {
@@ -19,7 +19,7 @@ func TestAccEnvironment_basic(t *testing.T) {
 		CheckDestroy: testAccCheckEnvironmentDestroy,
 		Steps: []resource.TestStep{
 			{
-				Config: fmt.Sprintf(testRunscopeEnvrionmentConfigA, teamID, teamID),
+				Config: fmt.Sprintf(testRunscopeEnvironmentConfigA, teamID, teamID),
 				Check: resource.ComposeTestCheckFunc(
 					testAccCheckEnvironmentExists("runscope_environment.environmentA"),
 					resource.TestCheckResourceAttr(
@@ -39,7 +39,7 @@ func TestAccEnvironment_emails(t *testing.T) {
 		CheckDestroy: testAccCheckEnvironmentDestroy,
 		Steps: []resource.TestStep{
 			{
-				Config: fmt.Sprintf(testRunscopeEnvrionmentConfigWithEmail, teamID, teamID),
+				Config: fmt.Sprintf(testRunscopeEnvironmentConfigWithEmail, teamID, teamID),
 				Check: resource.ComposeTestCheckFunc(
 					testAccCheckEnvironmentExists("runscope_environment.environmentA"),
 					resource.TestCheckResourceAttr("runscope_environment.environmentA", "name", "test-environment"),
@@ -65,7 +65,7 @@ func TestAccEnvironment_do_not_verify_ssl(t *testing.T) {
 		CheckDestroy: testAccCheckEnvironmentDestroy,
 		Steps: []resource.TestStep{
 			{
-				Config: fmt.Sprintf(testRunscopeEnvrionmentConfigB, teamID, teamID),
+				Config: fmt.Sprintf(testRunscopeEnvironmentConfigB, teamID, teamID),
 				Check: resource.ComposeTestCheckFunc(
 					testAccCheckEnvironmentExists("runscope_environment.environmentB"),
 					resource.TestCheckResourceAttr(
@@ -171,7 +171,7 @@ func testAccCheckEnvironmentExists(n string) resource.TestCheckFunc {
 	}
 }
 
-const testRunscopeEnvrionmentConfigA = `
+const testRunscopeEnvironmentConfigA = `
 resource "runscope_environment" "environmentA" {
   bucket_id    = "${runscope_bucket.bucket.id}"
   name         = "test-environment"
@@ -186,12 +186,12 @@ resource "runscope_environment" "environmentA" {
   }
 
 	regions = ["us1", "eu1"]
-	
+
 	remote_agents {
 			name = "test agent"
 			uuid = "arbitrary-string"
 		}
-	
+
 
 	retry_on_failure = true
 	webhooks = ["https://example.com"]
@@ -213,7 +213,7 @@ data "runscope_integration" "slack" {
   type = "slack"
 }
 `
-const testRunscopeEnvrionmentConfigWithEmail = `
+const testRunscopeEnvironmentConfigWithEmail = `
 resource "runscope_environment" "environmentA" {
   bucket_id    = "${runscope_bucket.bucket.id}"
   name         = "test-environment"
@@ -228,7 +228,7 @@ resource "runscope_environment" "environmentA" {
   }
 
   regions = ["us1", "eu1"]
-	
+
 	remote_agents {
 			name = "test agent"
 			uuid = "arbitrary-string"
@@ -249,7 +249,7 @@ resource "runscope_environment" "environmentA" {
       		name = "bob"
       		email = "bob@gmail.com"
       	}
-      
+
 	}
 }
 
@@ -270,7 +270,7 @@ data "runscope_integration" "slack" {
 }
 `
 
-const testRunscopeEnvrionmentConfigB = `
+const testRunscopeEnvironmentConfigB = `
 resource "runscope_environment" "environmentB" {
   bucket_id    = "${runscope_bucket.bucket.id}"
   name         = "test-no-ssl"
@@ -285,12 +285,12 @@ resource "runscope_environment" "environmentB" {
   }
 
   regions = ["us1", "eu1"]
-	
+
   remote_agents {
       name = "test agent"
 	  uuid = "arbitrary-string"
 	}
-  
+
 
 	retry_on_failure = true
 	webhooks = ["https://example.com"]
