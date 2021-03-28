@@ -75,7 +75,26 @@ func resourceRunscopeEnvironment() *schema.Resource {
 						},
 					},
 				},
-				Optional: true,
+				Optional:      true,
+				ConflictsWith: []string{"remote_agent"},
+				Deprecated:    "use remote_agent instead",
+			},
+			"remote_agent": {
+				Type: schema.TypeSet,
+				Elem: &schema.Resource{
+					Schema: map[string]*schema.Schema{
+						"name": {
+							Type:     schema.TypeString,
+							Required: true,
+						},
+						"uuid": {
+							Type:     schema.TypeString,
+							Required: true,
+						},
+					},
+				},
+				Optional:      true,
+				ConflictsWith: []string{"remote_agents"},
 			},
 			"retry_on_failure": {
 				Type:     schema.TypeBool,
@@ -137,7 +156,55 @@ func resourceRunscopeEnvironment() *schema.Resource {
 						},
 					},
 				},
-				Optional: true,
+				Optional:      true,
+				ConflictsWith: []string{"email"},
+				Deprecated:    "use email instead",
+			},
+			"email": {
+				Type:     schema.TypeList,
+				MaxItems: 1,
+				Elem: &schema.Resource{
+					Schema: map[string]*schema.Schema{
+						"notify_all": {
+							Type:     schema.TypeBool,
+							Required: true,
+						},
+						"notify_on": {
+							Type:     schema.TypeString,
+							Required: true,
+							ValidateFunc: validation.StringInSlice([]string{
+								"all", "failures", "threshold", "switch",
+							}, false),
+						},
+						"notify_threshold": {
+							Type:     schema.TypeInt,
+							Required: true,
+						},
+						"recipient": {
+							Type:     schema.TypeSet,
+							Required: true,
+							Elem: &schema.Resource{
+								Schema: map[string]*schema.Schema{
+									"name": {
+										Type:     schema.TypeString,
+										Optional: true,
+									},
+									"id": {
+										Type:     schema.TypeString,
+										Optional: true,
+									},
+									"email": {
+										Type:     schema.TypeString,
+										Optional: true,
+									},
+								},
+							},
+							Set: recipientsHash,
+						},
+					},
+				},
+				Optional:      true,
+				ConflictsWith: []string{"emails"},
 			},
 		},
 	}
@@ -212,7 +279,12 @@ func resourceEnvironmentRead(d *schema.ResourceData, meta interface{}) error {
 	d.Set("retry_on_failure", environment.RetryOnFailure)
 	d.Set("verify_ssl", environment.VerifySsl)
 	d.Set("webhooks", environment.WebHooks)
-	d.Set("emails", readEmail(environment.EmailSettings))
+
+	if _, ok := d.GetOk("emails"); ok {
+		d.Set("emails", readEmail(environment.EmailSettings))
+	} else {
+		d.Set("email", readEmail(environment.EmailSettings))
+	}
 	return nil
 }
 
@@ -229,10 +301,12 @@ func resourceEnvironmentUpdate(d *schema.ResourceData, meta interface{}) error {
 		d.HasChange("initial_variables") ||
 		d.HasChange("integrations") ||
 		d.HasChange("regions") ||
+		d.HasChange("remote_agent") ||
 		d.HasChange("remote_agents") ||
 		d.HasChange("retry_on_failure") ||
 		d.HasChange("verify_ssl") ||
 		d.HasChange("webhooks") ||
+		d.HasChange("email") ||
 		d.HasChange("emails") {
 		client := meta.(*runscope.Client)
 		bucketID := d.Get("bucket_id").(string)
@@ -335,7 +409,16 @@ func createEnvironmentFromResourceData(d *schema.ResourceData) (*runscope.Enviro
 		environment.Regions = regions
 	}
 
-	if attr, ok := d.GetOk("remote_agents"); ok {
+	func() {
+		var attr interface{}
+		var ok bool
+
+		if attr, ok = d.GetOk("remote_agents"); !ok {
+			if attr, ok = d.GetOk("remote_agent"); !ok {
+				return
+			}
+		}
+
 		remoteAgents := []*runscope.LocalMachine{}
 		items := attr.(*schema.Set)
 		for _, x := range items.List() {
@@ -349,7 +432,7 @@ func createEnvironmentFromResourceData(d *schema.ResourceData) (*runscope.Enviro
 		}
 
 		environment.RemoteAgents = remoteAgents
-	}
+	}()
 
 	if attr, ok := d.GetOk("retry_on_failure"); ok {
 		environment.RetryOnFailure = attr.(bool)
@@ -370,7 +453,18 @@ func createEnvironmentFromResourceData(d *schema.ResourceData) (*runscope.Enviro
 		environment.WebHooks = webhooks
 	}
 
-	if attr, ok := d.GetOk("emails"); ok {
+	func() {
+		var attr interface{}
+		var ok bool
+		recipientsAttrName := "recipients"
+
+		if attr, ok = d.GetOk("emails"); !ok {
+			if attr, ok = d.GetOk("email"); !ok {
+				return
+			}
+			recipientsAttrName = "recipient"
+		}
+
 		contacts := []*runscope.Contact{}
 		tmp := attr.([]interface{})
 		items := tmp[0].(map[string]interface{})
@@ -380,7 +474,7 @@ func createEnvironmentFromResourceData(d *schema.ResourceData) (*runscope.Enviro
 			NotifyThreshold: items["notify_threshold"].(int),
 		}
 
-		for _, x := range items["recipients"].(*schema.Set).List() {
+		for _, x := range items[recipientsAttrName].(*schema.Set).List() {
 			item := x.(map[string]interface{})
 			contact := runscope.Contact{
 				Name:  item["name"].(string),
@@ -394,7 +488,7 @@ func createEnvironmentFromResourceData(d *schema.ResourceData) (*runscope.Enviro
 		emailSettings.Recipients = contacts
 		environment.EmailSettings = &emailSettings
 
-	}
+	}()
 	return environment, nil
 }
 

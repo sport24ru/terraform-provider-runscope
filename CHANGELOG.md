@@ -1,5 +1,14 @@
 ## 0.8.0 (Unreleased)
 
+NOTES:
+
+* Deprecated attributes `remote_agents` and `emails` of `runscope_environment`.
+  Use `remote_agent` and `email` instead.
+
+ENHANCEMENTS:
+
+* Added attributes `remote_agent` and `email` of `runscope_environment`.
+
 ## 0.7.0 (March 27, 2021)
 
 ENHANCEMENTS:
