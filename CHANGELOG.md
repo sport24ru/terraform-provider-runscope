@@ -1,4 +1,6 @@
-## 0.8.0 (Unreleased)
+## 1.0.0 (Unreleased)
+
+## 0.8.0 (March 29, 2021)
 
 NOTES:
 
