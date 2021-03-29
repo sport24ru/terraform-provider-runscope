@@ -22,22 +22,22 @@ resource "runscope_step" "main_page" {
   url       = "http://example.com"
   note      = "A comment for the test step"
   method    = "GET"
-  variables {
+  variable {
     name   = "httpStatus"
     source = "response_status"
   }
-  variables {
+  variable {
     name     = "httpContentEncoding"
     source   = "response_header"
     property = "Content-Encoding"
   }
 
-  assertions {
+  assertion {
     source     = "response_status"
     comparison = "equal_number"
     value      = "200"
   }
-  assertions {
+  assertion {
     source     = "response_json"
     comparison = "equal"
     value      = "c5baeb4a-2379-478a-9cda-1b671de77cf9"
@@ -61,15 +61,15 @@ resource "runscope_step" "main_page" {
        alert('this is a multi-line after script')
     EOF
   ]
-  headers {
+  header {
     header = "Accept-Encoding"
     value  = "application/json"
   }
-  headers {
+  header {
     header = "Accept-Encoding"
     value  = "application/xml"
   }
-  headers {
+  header {
     header = "Authorization"
     value  = "Bearer bb74fe7b-b9f2-48bd-9445-bdc60e1edc6a"
   }
@@ -106,33 +106,37 @@ The following arguments are supported:
 When creating a `request` type of step the additional arguments also apply:
 
 * `method` - (Required) The HTTP method for this request step.
-* `variables` - (Optional) A list of variables to extract out of the HTTP response from this request. Variables documented below.
-* `assertions` - (Optional) A list of assertions to apply to the HTTP response from this request. Assertions documented below.
-* `headers` - (Optional) A list of headers to apply to the request. Headers documented below.
+* `variable` - (Optional) Block describing variable to extract out of the HTTP response from this request. May be declared multiple times. Variable documented below.
+* `assertion` - (Optional) Block describing assertion to apply to the HTTP response from this request. May be declared multiple times. Assertion documented below.
+* `header` - (Optional) Block describing header to apply to the request. May be declared multiple times. Header documented below.
 * `body` - (Optional) A string to use as the body of the request.
 * `auth` - (Optional) The credentials used to authenticate the request
 * `before_script` - (Optional) Runs a script before the request is made
 * `script` - (Optional) Runs a script after the request is made
 
-Variables (`variables`) supports the following:
+* `variables` - (Optional) **Deprecated**. Use `variable` block instead. A list of variables to extract out of the HTTP response from this request.
+* `assertions` - (Optional) **Deprecated**. Use `assertion` block instead. A list of assertions to apply to the HTTP response from this request.
+* `headers` - (Optional) **Deprecated**. Use `header` block instead. A list of headers to apply to the request.
+
+Variable (`variable`) supports the following:
 
 * `name` - (Required) Name of the variable to define.
 * `property` - (Required) The name of the source property. i.e. header name or json path
 * `source` - (Required) The variable source, for list of allowed values see: https://www.runscope.com/docs/api/steps#assertions
 
-Assertions (`assertions`) supports the following:
+Assertion (`assertion`) supports the following:
 
 * `source` - (Required) The assertion source, for list of allowed values see: https://www.runscope.com/docs/api/steps#assertions
 * `property` - (Optional) The name of the source property. i.e. header name or json path
 * `comparison` - (Required) The assertion comparison to make i.e. `equals`, for list of allowed values see: https://www.runscope.com/docs/api/steps#assertions
 * `value` - (Optional) The value the `comparison` will use
 
-**Example Assertions**
+**Example Assertion**
 
 Status Code == 200
 
-```json
-"assertions": [
+```
+"assertion": [
     {
         "source": "response_status",
         "comparison": "equal_number",
@@ -144,8 +148,8 @@ Status Code == 200
 JSON element 'address' contains the text "avenue"
 
 
-```json
-"assertions": [
+```
+"assertion": [
     {
         "source": "response_json",
         "property": "address",
@@ -158,8 +162,8 @@ JSON element 'address' contains the text "avenue"
 Response Time is faster than 1 second.
 
 
-```json
-"assertions": [
+```
+"assertion": [
     {
         "source": "response_time",
         "comparison": "is_less_than",

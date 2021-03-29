@@ -4,10 +4,13 @@ NOTES:
 
 * Deprecated attributes `remote_agents` and `emails` of `runscope_environment`.
   Use `remote_agent` and `email` instead.
+* Deprecated attribute `variables`, `assertions` and `headers` of `runscope_step`.
+  Use `variable` instead.
 
 ENHANCEMENTS:
 
 * Added attributes `remote_agent` and `email` of `runscope_environment`.
+* Added attribute `variable`, `assertion` and `header` of `runscope_step`.
 
 ## 0.7.0 (March 27, 2021)
 

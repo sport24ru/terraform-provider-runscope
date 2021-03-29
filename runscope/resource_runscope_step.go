@@ -117,7 +117,30 @@ func resourceRunscopeStep() *schema.Resource {
 						},
 					},
 				},
-				Optional: true,
+				Optional:      true,
+				ConflictsWith: []string{"variable"},
+				Deprecated:    "use variable instead",
+			},
+			"variable": {
+				Type: schema.TypeSet,
+				Elem: &schema.Resource{
+					Schema: map[string]*schema.Schema{
+						"name": {
+							Type:     schema.TypeString,
+							Required: true,
+						},
+						"property": {
+							Type:     schema.TypeString,
+							Optional: true,
+						},
+						"source": {
+							Type:     schema.TypeString,
+							Required: true,
+						},
+					},
+				},
+				Optional:      true,
+				ConflictsWith: []string{"variables"},
 			},
 			// TODO: rename to "assertion" for better UX
 			"assertions": {
@@ -142,7 +165,34 @@ func resourceRunscopeStep() *schema.Resource {
 						},
 					},
 				},
-				Optional: true,
+				Optional:      true,
+				ConflictsWith: []string{"assertion"},
+				Deprecated:    "use assertion instead",
+			},
+			"assertion": {
+				Type: schema.TypeList,
+				Elem: &schema.Resource{
+					Schema: map[string]*schema.Schema{
+						"source": {
+							Type:     schema.TypeString,
+							Required: true,
+						},
+						"property": {
+							Type:     schema.TypeString,
+							Optional: true,
+						},
+						"comparison": {
+							Type:     schema.TypeString,
+							Required: true,
+						},
+						"value": {
+							Type:     schema.TypeString,
+							Optional: true,
+						},
+					},
+				},
+				Optional:      true,
+				ConflictsWith: []string{"assertions"},
 			},
 			// TODO: rename to "header" for better UX
 			"headers": {
@@ -160,6 +210,25 @@ func resourceRunscopeStep() *schema.Resource {
 						},
 					},
 				},
+				ConflictsWith: []string{"header"},
+				Deprecated:    "use header instead",
+			},
+			"header": {
+				Type:     schema.TypeSet,
+				Optional: true,
+				Elem: &schema.Resource{
+					Schema: map[string]*schema.Schema{
+						"header": {
+							Type:     schema.TypeString,
+							Required: true,
+						},
+						"value": {
+							Type:     schema.TypeString,
+							Required: true,
+						},
+					},
+				},
+				ConflictsWith: []string{"headers"},
 			},
 			"auth": {
 				Type:     schema.TypeSet,
@@ -248,9 +317,21 @@ func resourceStepRead(d *schema.ResourceData, meta interface{}) error {
 	d.Set("method", step.Method)
 	d.Set("url", step.URL)
 	d.Set("body", step.Body)
-	d.Set("variables", readVariables(step.Variables))
-	d.Set("assertions", readAssertions(step.Assertions))
-	d.Set("headers", readHeaders(step.Headers))
+	if _, ok := d.GetOk("variables"); ok {
+		d.Set("variables", readVariables(step.Variables))
+	} else {
+		d.Set("variable", readVariables(step.Variables))
+	}
+	if _, ok := d.GetOk("assertions"); ok {
+		d.Set("assertions", readAssertions(step.Assertions))
+	} else {
+		d.Set("assertion", readAssertions(step.Assertions))
+	}
+	if _, ok := d.GetOk("headers"); ok {
+		d.Set("headers", readHeaders(step.Headers))
+	} else {
+		d.Set("header", readHeaders(step.Headers))
+	}
 	d.Set("scripts", step.Scripts)
 	d.Set("before_scripts", step.BeforeScripts)
 	d.Set("note", step.Note)
@@ -276,7 +357,10 @@ func resourceStepUpdate(d *schema.ResourceData, meta interface{}) error {
 
 	if d.HasChange("url") ||
 		d.HasChange("variables") ||
+		d.HasChange("variable") ||
+		d.HasChange("assertion") ||
 		d.HasChange("assertions") ||
+		d.HasChange("header") ||
 		d.HasChange("headers") ||
 		d.HasChange("body") ||
 		d.HasChange("note") {
@@ -323,7 +407,16 @@ func createStepFromResourceData(d *schema.ResourceData) (*runscope.TestStep, str
 		step.URL = attr.(string)
 	}
 
-	if attr, ok := d.GetOk("variables"); ok {
+	func() {
+		var attr interface{}
+		var ok bool
+
+		if attr, ok = d.GetOk("variables"); !ok {
+			if attr, ok = d.GetOk("variable"); !ok {
+				return
+			}
+		}
+
 		variables := []*runscope.Variable{}
 		items := attr.(*schema.Set)
 		for _, x := range items.List() {
@@ -337,7 +430,7 @@ func createStepFromResourceData(d *schema.ResourceData) (*runscope.TestStep, str
 			variables = append(variables, &variable)
 		}
 		step.Variables = variables
-	}
+	}()
 
 	if v, _ := d.GetOk("auth"); v != nil {
 		authSet := v.(*schema.Set).List()
@@ -351,7 +444,16 @@ func createStepFromResourceData(d *schema.ResourceData) (*runscope.TestStep, str
 		}
 	}
 
-	if attr, ok := d.GetOk("assertions"); ok {
+	func() {
+		var attr interface{}
+		var ok bool
+
+		if attr, ok = d.GetOk("assertions"); !ok {
+			if attr, ok = d.GetOk("assertion"); !ok {
+				return
+			}
+		}
+
 		assertions := []*runscope.Assertion{}
 		items := attr.([]interface{})
 		for _, x := range items {
@@ -367,9 +469,18 @@ func createStepFromResourceData(d *schema.ResourceData) (*runscope.TestStep, str
 		}
 
 		step.Assertions = assertions
-	}
+	}()
 
-	if attr, ok := d.GetOk("headers"); ok {
+	func() {
+		var attr interface{}
+		var ok bool
+
+		if attr, ok = d.GetOk("headers"); !ok {
+			if attr, ok = d.GetOk("header"); !ok {
+				return
+			}
+		}
+
 		step.Headers = make(map[string][]string)
 		items := attr.(*schema.Set)
 		for _, x := range items.List() {
@@ -377,7 +488,7 @@ func createStepFromResourceData(d *schema.ResourceData) (*runscope.TestStep, str
 			header := item["header"].(string)
 			step.Headers[header] = append(step.Headers[header], item["value"].(string))
 		}
-	}
+	}()
 
 	if attr, ok := d.GetOk("scripts"); ok {
 		step.Scripts = expandStringList(attr.([]interface{}))
