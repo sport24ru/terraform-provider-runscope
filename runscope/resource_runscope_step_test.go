@@ -23,17 +23,6 @@ func TestAccStep_basic(t *testing.T) {
 					testAccCheckStepMainPageExists("runscope_step.main_page"),
 					resource.TestCheckResourceAttr(
 						"runscope_step.main_page", "url", "http://example.com"),
-					resource.TestCheckResourceAttr("runscope_step.main_page", "variables.#", "2"),
-					resource.TestCheckResourceAttr("runscope_step.main_page", "assertions.#", "2"),
-					resource.TestCheckResourceAttr("runscope_step.main_page", "headers.#", "3"),
-				),
-			},
-			{
-				Config: fmt.Sprintf(testRunscopeStepConfigAWithSingulars, teamID),
-				Check: resource.ComposeTestCheckFunc(
-					testAccCheckStepMainPageExists("runscope_step.main_page"),
-					resource.TestCheckResourceAttr(
-						"runscope_step.main_page", "url", "http://example.com"),
 					resource.TestCheckResourceAttr("runscope_step.main_page", "variable.#", "2"),
 					resource.TestCheckResourceAttr("runscope_step.main_page", "assertion.#", "2"),
 					resource.TestCheckResourceAttr("runscope_step.main_page", "header.#", "3"),
@@ -256,77 +245,6 @@ func testAccCheckStepOrder(n string) resource.TestCheckFunc {
 }
 
 const testRunscopeStepConfigA = `
-resource "runscope_step" "main_page" {
-  bucket_id      = "${runscope_bucket.bucket.id}"
-  test_id        = "${runscope_test.test.id}"
-  step_type      = "request"
-  note           = "Testing step, single step test"
-  url            = "http://example.com"
-  method         = "GET"
-  variables {
-  	   name     = "httpStatus"
-  	   source   = "response_status"
-  	}
-  	variables {
-  	   name     = "httpContentEncoding"
-  	   source   = "response_header"
-  	   property = "Content-Encoding"
-  	}
-
-  assertions {
-  	   source     = "response_status"
-           comparison = "equal_number"
-           value      = "200"
-  	}
-  	assertions {
-  	   source     = "response_json"
-           comparison = "equal"
-           value      = "c5baeb4a-2379-478a-9cda-1b671de77cf9"
-           property   = "data.id"
-  	}
-
-  headers 	{
-  		header = "Accept-Encoding"
-  		value  = "application/json"
-  	}
-  	headers {
-  		header = "Accept-Encoding"
-  		value  = "application/xml"
-  	}
-  	headers {
-  		header = "Authorization"
-  		value  = "Bearer bb74fe7b-b9f2-48bd-9445-bdc60e1edc6a"
-	}
-
-
-  auth {
-	username  = "user"
-	auth_type = "basic"
-	password  = "password1"
-  }
-
-  scripts = [
-    "log(\"script 1\");",
-    "log(\"script 2\");",
-  ]
-  before_scripts = [
-    "log(\"before script\");",
-  ]
-}
-
-resource "runscope_test" "test" {
-  bucket_id   = "${runscope_bucket.bucket.id}"
-  name        = "runscope test"
-  description = "This is a test test..."
-}
-
-resource "runscope_bucket" "bucket" {
-  name      = "terraform-provider-test"
-  team_uuid = "%s"
-}
-`
-
-const testRunscopeStepConfigAWithSingulars = `
 resource "runscope_step" "main_page" {
   bucket_id      = "${runscope_bucket.bucket.id}"
   test_id        = "${runscope_test.test.id}"

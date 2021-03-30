@@ -114,10 +114,6 @@ When creating a `request` type of step the additional arguments also apply:
 * `before_script` - (Optional) Runs a script before the request is made
 * `script` - (Optional) Runs a script after the request is made
 
-* `variables` - (Optional) **Deprecated**. Use `variable` block instead. A list of variables to extract out of the HTTP response from this request.
-* `assertions` - (Optional) **Deprecated**. Use `assertion` block instead. A list of assertions to apply to the HTTP response from this request.
-* `headers` - (Optional) **Deprecated**. Use `header` block instead. A list of headers to apply to the request.
-
 Variable (`variable`) supports the following:
 
 * `name` - (Required) Name of the variable to define.

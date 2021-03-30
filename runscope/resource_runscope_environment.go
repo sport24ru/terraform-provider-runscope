@@ -60,25 +60,6 @@ func resourceRunscopeEnvironment() *schema.Resource {
 				Optional: true,
 				Elem:     &schema.Schema{Type: schema.TypeString},
 			},
-			// TODO: rename this to remote_agent for UX
-			"remote_agents": {
-				Type: schema.TypeSet,
-				Elem: &schema.Resource{
-					Schema: map[string]*schema.Schema{
-						"name": {
-							Type:     schema.TypeString,
-							Required: true,
-						},
-						"uuid": {
-							Type:     schema.TypeString,
-							Required: true,
-						},
-					},
-				},
-				Optional:      true,
-				ConflictsWith: []string{"remote_agent"},
-				Deprecated:    "use remote_agent instead",
-			},
 			"remote_agent": {
 				Type: schema.TypeSet,
 				Elem: &schema.Resource{
@@ -93,8 +74,7 @@ func resourceRunscopeEnvironment() *schema.Resource {
 						},
 					},
 				},
-				Optional:      true,
-				ConflictsWith: []string{"remote_agents"},
+				Optional: true,
 			},
 			"retry_on_failure": {
 				Type:     schema.TypeBool,
@@ -110,55 +90,6 @@ func resourceRunscopeEnvironment() *schema.Resource {
 				Optional: true,
 				Elem:     &schema.Schema{Type: schema.TypeString},
 				Set:      schema.HashString,
-			},
-			// TODO: rename this to "email"
-			"emails": {
-				Type:     schema.TypeList,
-				MaxItems: 1,
-				Elem: &schema.Resource{
-					Schema: map[string]*schema.Schema{
-						"notify_all": {
-							Type:     schema.TypeBool,
-							Required: true,
-						},
-						"notify_on": {
-							Type:     schema.TypeString,
-							Required: true,
-							ValidateFunc: validation.StringInSlice([]string{
-								"all", "failures", "threshold", "switch",
-							}, false),
-						},
-						"notify_threshold": {
-							Type:     schema.TypeInt,
-							Required: true,
-						},
-						// TODO: rename this to "recipient"
-						"recipients": {
-							Type:     schema.TypeSet,
-							Required: true,
-							Elem: &schema.Resource{
-								Schema: map[string]*schema.Schema{
-									"name": {
-										Type:     schema.TypeString,
-										Optional: true,
-									},
-									"id": {
-										Type:     schema.TypeString,
-										Optional: true,
-									},
-									"email": {
-										Type:     schema.TypeString,
-										Optional: true,
-									},
-								},
-							},
-							Set: recipientsHash,
-						},
-					},
-				},
-				Optional:      true,
-				ConflictsWith: []string{"email"},
-				Deprecated:    "use email instead",
 			},
 			"email": {
 				Type:     schema.TypeList,
@@ -203,8 +134,7 @@ func resourceRunscopeEnvironment() *schema.Resource {
 						},
 					},
 				},
-				Optional:      true,
-				ConflictsWith: []string{"emails"},
+				Optional: true,
 			},
 		},
 	}
@@ -280,11 +210,7 @@ func resourceEnvironmentRead(d *schema.ResourceData, meta interface{}) error {
 	d.Set("verify_ssl", environment.VerifySsl)
 	d.Set("webhooks", environment.WebHooks)
 
-	if _, ok := d.GetOk("emails"); ok {
-		d.Set("emails", readEmail(environment.EmailSettings))
-	} else {
-		d.Set("email", readEmail(environment.EmailSettings))
-	}
+	d.Set("email", flattenEmailSettings(environment.EmailSettings))
 	return nil
 }
 
@@ -302,12 +228,10 @@ func resourceEnvironmentUpdate(d *schema.ResourceData, meta interface{}) error {
 		d.HasChange("integrations") ||
 		d.HasChange("regions") ||
 		d.HasChange("remote_agent") ||
-		d.HasChange("remote_agents") ||
 		d.HasChange("retry_on_failure") ||
 		d.HasChange("verify_ssl") ||
 		d.HasChange("webhooks") ||
-		d.HasChange("email") ||
-		d.HasChange("emails") {
+		d.HasChange("email") {
 		client := meta.(*runscope.Client)
 		bucketID := d.Get("bucket_id").(string)
 		if testID, ok := d.GetOk("test_id"); ok {
@@ -409,16 +333,7 @@ func createEnvironmentFromResourceData(d *schema.ResourceData) (*runscope.Enviro
 		environment.Regions = regions
 	}
 
-	func() {
-		var attr interface{}
-		var ok bool
-
-		if attr, ok = d.GetOk("remote_agents"); !ok {
-			if attr, ok = d.GetOk("remote_agent"); !ok {
-				return
-			}
-		}
-
+	if attr, ok := d.GetOk("remote_agent"); ok {
 		remoteAgents := []*runscope.LocalMachine{}
 		items := attr.(*schema.Set)
 		for _, x := range items.List() {
@@ -430,9 +345,8 @@ func createEnvironmentFromResourceData(d *schema.ResourceData) (*runscope.Enviro
 
 			remoteAgents = append(remoteAgents, &remoteAgent)
 		}
-
 		environment.RemoteAgents = remoteAgents
-	}()
+	}
 
 	if attr, ok := d.GetOk("retry_on_failure"); ok {
 		environment.RetryOnFailure = attr.(bool)
@@ -453,18 +367,7 @@ func createEnvironmentFromResourceData(d *schema.ResourceData) (*runscope.Enviro
 		environment.WebHooks = webhooks
 	}
 
-	func() {
-		var attr interface{}
-		var ok bool
-		recipientsAttrName := "recipients"
-
-		if attr, ok = d.GetOk("emails"); !ok {
-			if attr, ok = d.GetOk("email"); !ok {
-				return
-			}
-			recipientsAttrName = "recipient"
-		}
-
+	if attr, ok := d.GetOk("email"); ok {
 		contacts := []*runscope.Contact{}
 		tmp := attr.([]interface{})
 		items := tmp[0].(map[string]interface{})
@@ -474,7 +377,7 @@ func createEnvironmentFromResourceData(d *schema.ResourceData) (*runscope.Enviro
 			NotifyThreshold: items["notify_threshold"].(int),
 		}
 
-		for _, x := range items[recipientsAttrName].(*schema.Set).List() {
+		for _, x := range items["recipient"].(*schema.Set).List() {
 			item := x.(map[string]interface{})
 			contact := runscope.Contact{
 				Name:  item["name"].(string),
@@ -484,11 +387,10 @@ func createEnvironmentFromResourceData(d *schema.ResourceData) (*runscope.Enviro
 
 			contacts = append(contacts, &contact)
 		}
-
 		emailSettings.Recipients = contacts
 		environment.EmailSettings = &emailSettings
+	}
 
-	}()
 	return environment, nil
 }
 
@@ -508,27 +410,29 @@ func readIntegrations(integrations []*runscope.EnvironmentIntegration) []map[str
 	return result
 }
 
-func readEmail(emailSettings *runscope.EmailSettings) interface{} {
-	resultRecipients := make([]interface{}, 0, 4)
-
-	for _, recipient := range emailSettings.Recipients {
-		item := map[string]interface{}{
-			"name":  recipient.Name,
-			"email": recipient.Email,
-			"id":    recipient.ID,
-		}
-		resultRecipients = append(resultRecipients, item)
-	}
-
+func flattenEmailSettings(emailSettings *runscope.EmailSettings) interface{} {
 	item := map[string]interface{}{
 		"notify_all":       emailSettings.NotifyAll,
 		"notify_on":        emailSettings.NotifyOn,
 		"notify_threshold": emailSettings.NotifyThreshold,
-		"recipients":       resultRecipients,
+	}
+
+	if len(emailSettings.Recipients) > 0 {
+		resultRecipients := []interface{}{}
+
+		for _, recipient := range emailSettings.Recipients {
+			item := map[string]interface{}{
+				"name":  recipient.Name,
+				"email": recipient.Email,
+				"id":    recipient.ID,
+			}
+			resultRecipients = append(resultRecipients, item)
+		}
+
+		item["recipient"] = resultRecipients
 	}
 
 	return item
-
 }
 
 func recipientsHash(v interface{}) int {

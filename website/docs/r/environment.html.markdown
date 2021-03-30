@@ -95,26 +95,23 @@ to to run to setup the environment
 * `integrations` - (Optional) A list of integration ids to enable for test runs using this environment.
 * `regions` - (Optional) A list of [Runscope regions](https://www.runscope.com/docs/regions) to execute test runs in when using this environment.
 * `remote_agent` - (Optional) Block describing the properties of [Remote Agent](https://www.runscope.com/docs/api/agents) to execute test runs in when using this environment. May be declared multiple times.
-Remote Agents documented below.
-* `remote_agents` - (Optional) **Deprecated**. Use `remote_agent` block instead. A list of [Remote Agents](https://www.runscope.com/docs/api/agents) to execute test runs in when using this environment.
-Remote Agents documented below.
+Remote Agent documented below.
 * `webhooks` - (Optional) A list of URL's to send results to when test runs using this environment finish.
 * `email` - (Optional) Block describing settings for sending email notifications upon completion of a test run using this environment. May be declared multiple times. Emails block is documented below
-* `emails` - (Optional) **Deprecated**. Use `email` block instead. A list of settings for sending email notifications upon completion of a test run using this environment. Emails block is documented below
 
-Remote Agents (`remote_agent`) supports the following:
+Remote Agent (`remote_agent`) supports the following:
 
 * `name` - (Required) The name of the remote agent
 * `uuid` - (Required) The uuid of the remote agent
 
-Emails (`email`) supports the following:
+Email (`email`) supports the following:
 
 * `notify_all` - (Required) Send an email to all team members according to the `notify_on` rules.
 * `notify_on` - (Required) Upon completion of a test run Runscope will send email notifications, allowed values: `all`, `failures`, `threshold` or `switch`
 * `notify_threshold` (Required) An integer between 1 and 10 for use with the `notify_on settings`: only used when `threshold` and `switch` values are given
 * `recipient` (Required) Block describing recipient, documented below. May be declared multiple times.
 
-Recipients (`recipient`), See [team api](https://www.runscope.com/docs/api/teams), supports the following:
+Recipient (`recipient`), See [team api](https://www.runscope.com/docs/api/teams), supports the following:
 
 * `name` - (Optional) The name of the person.
 * `id` - (Optional) The unique identifier for this person's account.

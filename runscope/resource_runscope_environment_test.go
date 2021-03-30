@@ -40,32 +40,6 @@ func TestAccEnvironment_basic(t *testing.T) {
 	})
 }
 
-func TestAccEnvironment_emails(t *testing.T) {
-	teamID := os.Getenv("RUNSCOPE_TEAM_ID")
-	resource.Test(t, resource.TestCase{
-		PreCheck:     func() { testAccPreCheck(t) },
-		Providers:    testAccProviders,
-		CheckDestroy: testAccCheckEnvironmentDestroy,
-		Steps: []resource.TestStep{
-			{
-				Config: fmt.Sprintf(testRunscopeEnvironmentConfigWithEmail, teamID, teamID),
-				Check: resource.ComposeTestCheckFunc(
-					testAccCheckEnvironmentExists("runscope_environment.environmentA"),
-					resource.TestCheckResourceAttr("runscope_environment.environmentA", "name", "test-environment"),
-					resource.TestCheckResourceAttr("runscope_environment.environmentA", "verify_ssl", "true"),
-					resource.TestCheckResourceAttr("runscope_environment.environmentA", "emails.#", "1"),
-					resource.TestCheckResourceAttr("runscope_environment.environmentA", "emails.0.notify_all", "true"),
-					resource.TestCheckResourceAttr("runscope_environment.environmentA", "emails.0.notify_on", "all"),
-					resource.TestCheckResourceAttr("runscope_environment.environmentA", "emails.0.notify_threshold", "1"),
-					resource.TestCheckResourceAttr("runscope_environment.environmentA", "emails.0.recipients.#", "2"),
-					resource.TestCheckResourceAttr("runscope_environment.environmentA", "emails.0.recipients.769210288.name", "bob"),
-					resource.TestCheckResourceAttr("runscope_environment.environmentA", "emails.0.recipients.769210288.email", "bob@gmail.com"),
-				),
-			},
-		},
-	})
-}
-
 func TestAccEnvironment_email(t *testing.T) {
 	teamID := os.Getenv("RUNSCOPE_TEAM_ID")
 	resource.Test(t, resource.TestCase{
@@ -74,7 +48,7 @@ func TestAccEnvironment_email(t *testing.T) {
 		CheckDestroy: testAccCheckEnvironmentDestroy,
 		Steps: []resource.TestStep{
 			{
-				Config: fmt.Sprintf(testRunscopeEnvironmentConfigWithEmailSingular, teamID, teamID),
+				Config: fmt.Sprintf(testRunscopeEnvironmentConfigWithEmail, teamID, teamID),
 				Check: resource.ComposeTestCheckFunc(
 					testAccCheckEnvironmentExists("runscope_environment.environmentA"),
 					resource.TestCheckResourceAttr("runscope_environment.environmentA", "name", "test-environment"),
@@ -222,7 +196,7 @@ resource "runscope_environment" "environmentA" {
 
 	regions = ["us1", "eu1"]
 
-	remote_agents {
+	remote_agent {
 			name = "test agent"
 			uuid = "arbitrary-string"
 		}
@@ -308,64 +282,7 @@ resource "runscope_environment" "environmentA" {
 
   regions = ["us1", "eu1"]
 
-	remote_agents {
-			name = "test agent"
-			uuid = "arbitrary-string"
-		}
-
-	retry_on_failure = true
-	webhooks = ["https://example.com"]
-	emails {
-	  notify_all       = true
-      notify_on        = "all"
-      notify_threshold = 1
-
-      recipients {
-      		name = "marek"
-      		email = "marekpastierik15@gmail.com"
-      	}
-      	recipients {
-      		name = "bob"
-      		email = "bob@gmail.com"
-      	}
-
-	}
-}
-
-resource "runscope_test" "test" {
-  bucket_id = "${runscope_bucket.bucket.id}"
-  name = "runscope test"
-  description = "This is a test test..."
-}
-
-resource "runscope_bucket" "bucket" {
-  name = "terraform-provider-test"
-  team_uuid = "%s"
-}
-
-data "runscope_integration" "slack" {
-  team_uuid = "%s"
-  type = "slack"
-}
-`
-
-const testRunscopeEnvironmentConfigWithEmailSingular = `
-resource "runscope_environment" "environmentA" {
-  bucket_id    = "${runscope_bucket.bucket.id}"
-  name         = "test-environment"
-
-  integrations = [
-		"${data.runscope_integration.slack.id}"
-  ]
-
-  initial_variables = {
-    var1 = "true"
-    var2 = "value2"
-  }
-
-  regions = ["us1", "eu1"]
-
-	remote_agents {
+	remote_agent {
 			name = "test agent"
 			uuid = "arbitrary-string"
 		}
@@ -373,19 +290,18 @@ resource "runscope_environment" "environmentA" {
 	retry_on_failure = true
 	webhooks = ["https://example.com"]
 	email {
-	  notify_all       = true
-      notify_on        = "all"
-      notify_threshold = 1
+		notify_all       = true
+		notify_on        = "all"
+		notify_threshold = 1
 
-      recipient {
-      		name = "marek"
-      		email = "marekpastierik15@gmail.com"
-      	}
-      	recipient {
-      		name = "bob"
-      		email = "bob@gmail.com"
-      	}
-
+		recipient {
+			name  = "marek"
+			email = "marekpastierik15@gmail.com"
+		}
+		recipient {
+			name  = "bob"
+			email = "bob@gmail.com"
+		}
 	}
 }
 
@@ -422,7 +338,7 @@ resource "runscope_environment" "environmentB" {
 
   regions = ["us1", "eu1"]
 
-  remote_agents {
+  remote_agent {
       name = "test agent"
 	  uuid = "arbitrary-string"
 	}

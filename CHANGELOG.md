@@ -1,5 +1,10 @@
 ## 1.0.0 (Unreleased)
 
+BREAKING CHANGES:
+
+* Removed deprecated attributes `remote_agents` and `emails` of `runscope_environment`
+  and `variables`, `assertions` and `headers` of `runscope_step`.
+
 ## 0.8.0 (March 29, 2021)
 
 NOTES:
@@ -7,7 +12,7 @@ NOTES:
 * Deprecated attributes `remote_agents` and `emails` of `runscope_environment`.
   Use `remote_agent` and `email` instead.
 * Deprecated attribute `variables`, `assertions` and `headers` of `runscope_step`.
-  Use `variable` instead.
+  Use `variable`, `assertion`, `header` instead.
 
 ENHANCEMENTS:
 
