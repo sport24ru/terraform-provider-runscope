@@ -3,7 +3,6 @@ package runscope
 import (
 	"fmt"
 	"os"
-	"strings"
 	"testing"
 
 	"github.com/ewilde/go-runscope"
@@ -12,29 +11,44 @@ import (
 )
 
 func TestAccEnvironment_basic(t *testing.T) {
-	teamID := os.Getenv("RUNSCOPE_TEAM_ID")
+	teamId := os.Getenv("RUNSCOPE_TEAM_ID")
+	environment := runscope.Environment{}
 	resource.Test(t, resource.TestCase{
 		PreCheck:     func() { testAccPreCheck(t) },
 		Providers:    testAccProviders,
 		CheckDestroy: testAccCheckEnvironmentDestroy,
 		Steps: []resource.TestStep{
 			{
-				Config: fmt.Sprintf(testRunscopeEnvironmentConfigA, teamID, teamID),
+				Config: fmt.Sprintf(testRunscopeEnvironmentMinimal, teamId),
 				Check: resource.ComposeTestCheckFunc(
-					testAccCheckEnvironmentExists("runscope_environment.environmentA"),
-					resource.TestCheckResourceAttr(
-						"runscope_environment.environmentA", "name", "test-environment"),
-					resource.TestCheckResourceAttr(
-						"runscope_environment.environmentA", "verify_ssl", "true")),
+					testAccCheckEnvironmentExists("runscope_environment.environmentA", &environment),
+					resource.TestCheckResourceAttr("runscope_environment.environmentA", "name", "test-environment"),
+					resource.TestCheckResourceAttr("runscope_environment.environmentA", "script", ""),
+					resource.TestCheckResourceAttr("runscope_environment.environmentA", "preserve_cookies", "false"),
+					resource.TestCheckResourceAttr("runscope_environment.environmentA", "initial_variables.%", "0"),
+					resource.TestCheckNoResourceAttr("runscope_environment.environmentA", "integrations"),
+					resource.TestCheckNoResourceAttr("runscope_environment.environmentA", "regions"),
+					resource.TestCheckResourceAttr("runscope_environment.environmentA", "retry_on_failure", "false"),
+					resource.TestCheckResourceAttr("runscope_environment.environmentA", "verify_ssl", "true"),
+					resource.TestCheckNoResourceAttr("runscope_environment.environmentA", "webhooks"),
+					resource.TestCheckResourceAttr("runscope_environment.environmentA", "email.#", "0"),
+				),
 			},
 			{
-				Config: fmt.Sprintf(testRunscopeEnvironmentConfigAWithSingularRemoteAgents, teamID, teamID),
+				Config: fmt.Sprintf(testRunscopeEnvironmentFull, teamId, teamId),
 				Check: resource.ComposeTestCheckFunc(
-					testAccCheckEnvironmentExists("runscope_environment.environmentA"),
-					resource.TestCheckResourceAttr(
-						"runscope_environment.environmentA", "name", "test-environment"),
-					resource.TestCheckResourceAttr(
-						"runscope_environment.environmentA", "verify_ssl", "true")),
+					testAccCheckEnvironmentExists("runscope_environment.environmentA", &environment),
+					resource.TestCheckResourceAttr("runscope_environment.environmentA", "name", "test-environment"),
+					resource.TestCheckResourceAttr("runscope_environment.environmentA", "script", "1;"),
+					resource.TestCheckResourceAttr("runscope_environment.environmentA", "preserve_cookies", "true"),
+					resource.TestCheckResourceAttr("runscope_environment.environmentA", "initial_variables.%", "2"),
+					resource.TestCheckResourceAttr("runscope_environment.environmentA", "integrations.#", "1"),
+					resource.TestCheckResourceAttr("runscope_environment.environmentA", "regions.#", "2"),
+					resource.TestCheckResourceAttr("runscope_environment.environmentA", "retry_on_failure", "true"),
+					resource.TestCheckResourceAttr("runscope_environment.environmentA", "verify_ssl", "true"),
+					resource.TestCheckResourceAttr("runscope_environment.environmentA", "webhooks.#", "1"),
+					resource.TestCheckResourceAttr("runscope_environment.environmentA", "email.#", "0"),
+				),
 			},
 		},
 	})
@@ -42,24 +56,107 @@ func TestAccEnvironment_basic(t *testing.T) {
 
 func TestAccEnvironment_email(t *testing.T) {
 	teamID := os.Getenv("RUNSCOPE_TEAM_ID")
+	environment := runscope.Environment{}
 	resource.Test(t, resource.TestCase{
 		PreCheck:     func() { testAccPreCheck(t) },
 		Providers:    testAccProviders,
 		CheckDestroy: testAccCheckEnvironmentDestroy,
 		Steps: []resource.TestStep{
 			{
-				Config: fmt.Sprintf(testRunscopeEnvironmentConfigWithEmail, teamID, teamID),
+				Config: fmt.Sprintf(testRunscopeEnvironmentConfigWithEmail, teamID),
 				Check: resource.ComposeTestCheckFunc(
-					testAccCheckEnvironmentExists("runscope_environment.environmentA"),
+					testAccCheckEnvironmentExists("runscope_environment.environmentA", &environment),
 					resource.TestCheckResourceAttr("runscope_environment.environmentA", "name", "test-environment"),
 					resource.TestCheckResourceAttr("runscope_environment.environmentA", "verify_ssl", "true"),
 					resource.TestCheckResourceAttr("runscope_environment.environmentA", "email.#", "1"),
 					resource.TestCheckResourceAttr("runscope_environment.environmentA", "email.0.notify_all", "true"),
 					resource.TestCheckResourceAttr("runscope_environment.environmentA", "email.0.notify_on", "all"),
 					resource.TestCheckResourceAttr("runscope_environment.environmentA", "email.0.notify_threshold", "1"),
-					resource.TestCheckResourceAttr("runscope_environment.environmentA", "email.0.recipient.#", "2"),
-					resource.TestCheckResourceAttr("runscope_environment.environmentA", "email.0.recipient.769210288.name", "bob"),
-					resource.TestCheckResourceAttr("runscope_environment.environmentA", "email.0.recipient.769210288.email", "bob@gmail.com"),
+					resource.TestCheckResourceAttr("runscope_environment.environmentA", "email.0.recipient.#", "0"),
+				),
+			},
+		},
+	})
+}
+
+func TestAccEnvironment_update_email(t *testing.T) {
+	teamID := os.Getenv("RUNSCOPE_TEAM_ID")
+	recipientId, recipientIdOk := os.LookupEnv("RUNSCOPE_RECIPIENT_ID")
+	if !recipientIdOk {
+		t.Skip("RUNSCOPE_RECIPIENT_ID should be set")
+		return
+	}
+
+	environment := runscope.Environment{}
+	resource.Test(t, resource.TestCase{
+		PreCheck:     func() { testAccPreCheck(t) },
+		Providers:    testAccProviders,
+		CheckDestroy: testAccCheckEnvironmentDestroy,
+		Steps: []resource.TestStep{
+			{
+				Config: fmt.Sprintf(testRunscopeEnvironmentMinimal, teamID),
+				Check: resource.ComposeTestCheckFunc(
+					testAccCheckEnvironmentExists("runscope_environment.environmentA", &environment),
+					testAccCheckEnvironmentEmail(&environment, false, "", 0, 0),
+				),
+			},
+			{
+				Config: fmt.Sprintf(testRunscopeEnvironmentConfigWithEmailRecipient, teamID, recipientId),
+				Check: resource.ComposeTestCheckFunc(
+					testAccCheckEnvironmentExists("runscope_environment.environmentA", &environment),
+					testAccCheckEnvironmentEmail(&environment, true, "all", 1, 1),
+				),
+			},
+			{
+				Config: fmt.Sprintf(testRunscopeEnvironmentMinimal, teamID),
+				Check: resource.ComposeTestCheckFunc(
+					testAccCheckEnvironmentExists("runscope_environment.environmentA", &environment),
+					testAccCheckEnvironmentEmail(&environment, false, "all", 1, 0),
+				),
+			},
+		},
+	})
+}
+
+func TestAccEnvironment_email_recipient(t *testing.T) {
+	teamId, ok := os.LookupEnv("RUNSCOPE_TEAM_ID")
+	if !ok {
+		t.Skip("RUNSCOPE_TEAM_ID should be set")
+		return
+	}
+
+	recipientId, recipientIdOk := os.LookupEnv("RUNSCOPE_RECIPIENT_ID")
+	recipientName, recipientNameOk := os.LookupEnv("RUNSCOPE_RECIPIENT_NAME")
+	recipientEmail, recipientEmailOk := os.LookupEnv("RUNSCOPE_RECIPIENT_EMAIL")
+
+	if !(recipientIdOk && recipientNameOk && recipientEmailOk) {
+		t.Skip("All of RUNSCOPE_RECIPIENT_ID, RUNSCOPE_RECIPIENT_NAME, RUNSCOPE_RECIPIENT_EMAIL should be set")
+		return
+	}
+
+	hash := recipientsHash(map[string]interface{}{
+		"id": recipientId,
+	})
+
+	environment := runscope.Environment{}
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:     func() { testAccPreCheck(t) },
+		Providers:    testAccProviders,
+		CheckDestroy: testAccCheckEnvironmentDestroy,
+		Steps: []resource.TestStep{
+			{
+				Config: fmt.Sprintf(testRunscopeEnvironmentConfigWithEmailRecipient, teamId, recipientId),
+				Check: resource.ComposeTestCheckFunc(
+					testAccCheckEnvironmentExists("runscope_environment.environmentA", &environment),
+					resource.TestCheckResourceAttr("runscope_environment.environmentA", "name", "test-environment"),
+					resource.TestCheckResourceAttr("runscope_environment.environmentA", "email.#", "1"),
+					resource.TestCheckResourceAttr("runscope_environment.environmentA", "email.0.notify_all", "true"),
+					resource.TestCheckResourceAttr("runscope_environment.environmentA", "email.0.notify_on", "all"),
+					resource.TestCheckResourceAttr("runscope_environment.environmentA", "email.0.notify_threshold", "1"),
+					resource.TestCheckResourceAttr("runscope_environment.environmentA", "email.0.recipient.#", "1"),
+					resource.TestCheckResourceAttr("runscope_environment.environmentA", fmt.Sprintf("email.0.recipient.%d.id", hash), recipientId),
+					testAccCheckEnvironmentRecipient(&environment, recipientId, recipientName, recipientEmail),
 				),
 			},
 		},
@@ -68,15 +165,16 @@ func TestAccEnvironment_email(t *testing.T) {
 
 func TestAccEnvironment_do_not_verify_ssl(t *testing.T) {
 	teamID := os.Getenv("RUNSCOPE_TEAM_ID")
+	environment := runscope.Environment{}
 	resource.Test(t, resource.TestCase{
 		PreCheck:     func() { testAccPreCheck(t) },
 		Providers:    testAccProviders,
 		CheckDestroy: testAccCheckEnvironmentDestroy,
 		Steps: []resource.TestStep{
 			{
-				Config: fmt.Sprintf(testRunscopeEnvironmentConfigB, teamID, teamID),
+				Config: fmt.Sprintf(testRunscopeEnvironmentConfigB, teamID),
 				Check: resource.ComposeTestCheckFunc(
-					testAccCheckEnvironmentExists("runscope_environment.environmentB"),
+					testAccCheckEnvironmentExists("runscope_environment.environmentB", &environment),
 					resource.TestCheckResourceAttr(
 						"runscope_environment.environmentB", "name", "test-no-ssl"),
 					resource.TestCheckResourceAttr(
@@ -113,7 +211,7 @@ func testAccCheckEnvironmentDestroy(s *terraform.State) error {
 	return nil
 }
 
-func testAccCheckEnvironmentExists(n string) resource.TestCheckFunc {
+func testAccCheckEnvironmentExists(n string, e *runscope.Environment) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
 		rs, ok := s.RootModule().Resources[n]
 
@@ -152,216 +250,156 @@ func testAccCheckEnvironmentExists(n string) resource.TestCheckFunc {
 			return fmt.Errorf("Record not found")
 		}
 
-		if len(foundRecord.Integrations) != 1 {
-			return fmt.Errorf("Expected %d integrations, actual %d", 1, len(foundRecord.Integrations))
-		}
+		*e = *foundRecord
 
-		if len(foundRecord.Regions) != 2 {
-			return fmt.Errorf("Expected %d regions, actual %d", 2, len(foundRecord.Regions))
-		}
+		return nil
+	}
+}
 
-		if !contains(foundRecord.Regions, "us1") {
-			return fmt.Errorf("Expected %s, actual %s", "us1", strings.Join(foundRecord.Regions, ","))
+func testAccCheckEnvironmentEmail(e *runscope.Environment, expectedNotifyAll bool, expectedNotifyOn string, expectedNotifyThreshold int, expectedNumRecipients int) resource.TestCheckFunc {
+	return func(s *terraform.State) error {
+		if e.EmailSettings.NotifyAll != expectedNotifyAll {
+			return fmt.Errorf("Expected NotifyAll '%v', got '%v'", expectedNotifyAll, e.EmailSettings.NotifyAll)
 		}
-
-		if !contains(foundRecord.Regions, "eu1") {
-			return fmt.Errorf("Expected %s, actual %s", "eu1", strings.Join(foundRecord.Regions, ","))
+		if e.EmailSettings.NotifyOn != expectedNotifyOn {
+			return fmt.Errorf("Expected NotifyOn '%s', got '%s'", expectedNotifyOn, e.EmailSettings.NotifyOn)
 		}
-
-		if !foundRecord.RetryOnFailure {
-			return fmt.Errorf("Expected retry_on_failure to be set to true")
+		if e.EmailSettings.NotifyThreshold != expectedNotifyThreshold {
+			return fmt.Errorf("Expected NotifyThreshold '%d', got '%d'", expectedNotifyThreshold, e.EmailSettings.NotifyThreshold)
 		}
+		if len(e.EmailSettings.Recipients) != expectedNumRecipients {
+			return fmt.Errorf("Expected '%d' recipients, got '%d'", expectedNumRecipients, len(e.EmailSettings.Recipients))
+		}
+		return nil
+	}
+}
 
-		if !contains(foundRecord.WebHooks, "https://example.com") {
-			return fmt.Errorf("Expected %s, actual %s", "https://example.com", strings.Join(foundRecord.WebHooks, ","))
+func testAccCheckEnvironmentRecipient(e *runscope.Environment, expectedId string, expectedName string, expectedEmail string) resource.TestCheckFunc {
+	return func(s *terraform.State) error {
+		id := e.EmailSettings.Recipients[0].ID
+		if id != expectedId {
+			return fmt.Errorf("Expected recipient ID '%s', got '%s'", expectedId, id)
+		}
+		name := e.EmailSettings.Recipients[0].Name
+		if name != expectedName {
+			return fmt.Errorf("Expected recipient name '%s', got '%s'", expectedName, name)
+		}
+		email := e.EmailSettings.Recipients[0].Email
+		if email != expectedEmail {
+			return fmt.Errorf("Expected recipient email '%s', got '%s'", expectedEmail, email)
 		}
 
 		return nil
 	}
 }
 
-const testRunscopeEnvironmentConfigA = `
-resource "runscope_environment" "environmentA" {
-  bucket_id    = "${runscope_bucket.bucket.id}"
-  name         = "test-environment"
-
-  integrations = [
-		"${data.runscope_integration.slack.id}",
-  ]
-
-  initial_variables = {
-    var1 = "true"
-    var2 = "value2"
-  }
-
-	regions = ["us1", "eu1"]
-
-	remote_agent {
-			name = "test agent"
-			uuid = "arbitrary-string"
-		}
-
-
-	retry_on_failure = true
-	webhooks = ["https://example.com"]
-}
-
-resource "runscope_test" "test" {
-  bucket_id = "${runscope_bucket.bucket.id}"
-  name = "runscope test"
-  description = "This is a test test..."
-}
-
+const testRunscopeEnvironmentMinimal = `
 resource "runscope_bucket" "bucket" {
-  name = "terraform-provider-test"
-  team_uuid = "%s"
+	name      = "terraform-provider-test"
+	team_uuid = "%s"
 }
 
-data "runscope_integration" "slack" {
-  team_uuid = "%s"
-  type = "slack"
+resource "runscope_environment" "environmentA" {
+	bucket_id = runscope_bucket.bucket.id
+	name      = "test-environment"
 }
 `
 
-const testRunscopeEnvironmentConfigAWithSingularRemoteAgents = `
+const testRunscopeEnvironmentFull = `
+resource "runscope_test" "test" {
+	bucket_id = runscope_bucket.bucket.id
+	name = "runscope test"
+	description = "This is a test test..."
+}
+
+resource "runscope_bucket" "bucket" {
+	name      = "terraform-provider-test"
+	team_uuid = "%s"
+}
+
+data "runscope_integration" "slack" {
+	team_uuid = "%s"
+	type      = "slack"
+}
+
 resource "runscope_environment" "environmentA" {
-  bucket_id    = "${runscope_bucket.bucket.id}"
-  name         = "test-environment"
+	bucket_id    = runscope_bucket.bucket.id
+	name         = "test-environment"
 
-  integrations = [
-		"${data.runscope_integration.slack.id}",
-  ]
+	script = "1;"
 
-  initial_variables = {
-    var1 = "true"
-    var2 = "value2"
-  }
+	preserve_cookies = true
+
+	initial_variables = {
+		var1 = "true"
+		var2 = "value2"
+	}
+
+	integrations = [
+		data.runscope_integration.slack.id,
+	]
 
 	regions = ["us1", "eu1"]
 
 	remote_agent {
-			name = "test agent"
-			uuid = "arbitrary-string"
-		}
-
+		name = "test agent"
+		uuid = "arbitrary-string"
+	}
 
 	retry_on_failure = true
-	webhooks = ["https://example.com"]
-}
-
-resource "runscope_test" "test" {
-  bucket_id = "${runscope_bucket.bucket.id}"
-  name = "runscope test"
-  description = "This is a test test..."
-}
-
-resource "runscope_bucket" "bucket" {
-  name = "terraform-provider-test"
-  team_uuid = "%s"
-}
-
-data "runscope_integration" "slack" {
-  team_uuid = "%s"
-  type = "slack"
+	webhooks         = ["https://example.com"]
 }
 `
 
 const testRunscopeEnvironmentConfigWithEmail = `
+resource "runscope_bucket" "bucket" {
+	name      = "terraform-provider-test"
+	team_uuid = "%s"
+}
+
 resource "runscope_environment" "environmentA" {
-  bucket_id    = "${runscope_bucket.bucket.id}"
-  name         = "test-environment"
+	bucket_id    = runscope_bucket.bucket.id
+	name         = "test-environment"
 
-  integrations = [
-		"${data.runscope_integration.slack.id}"
-  ]
-
-  initial_variables = {
-    var1 = "true"
-    var2 = "value2"
-  }
-
-  regions = ["us1", "eu1"]
-
-	remote_agent {
-			name = "test agent"
-			uuid = "arbitrary-string"
-		}
-
-	retry_on_failure = true
-	webhooks = ["https://example.com"]
 	email {
 		notify_all       = true
 		notify_on        = "all"
 		notify_threshold = 1
-
-		recipient {
-			name  = "marek"
-			email = "marekpastierik15@gmail.com"
-		}
-		recipient {
-			name  = "bob"
-			email = "bob@gmail.com"
-		}
 	}
 }
+`
 
-resource "runscope_test" "test" {
-  bucket_id = "${runscope_bucket.bucket.id}"
-  name = "runscope test"
-  description = "This is a test test..."
-}
-
+const testRunscopeEnvironmentConfigWithEmailRecipient = `
 resource "runscope_bucket" "bucket" {
-  name = "terraform-provider-test"
+  name      = "terraform-provider-test"
   team_uuid = "%s"
 }
 
-data "runscope_integration" "slack" {
-  team_uuid = "%s"
-  type = "slack"
+resource "runscope_environment" "environmentA" {
+	bucket_id    = "${runscope_bucket.bucket.id}"
+	name         = "test-environment"
+
+	email {
+		notify_all       = true
+		notify_on        = "all"
+		notify_threshold = 1
+		recipient {
+ 			id = "%s"
+        }
+	}
 }
 `
 
 const testRunscopeEnvironmentConfigB = `
-resource "runscope_environment" "environmentB" {
-  bucket_id    = "${runscope_bucket.bucket.id}"
-  name         = "test-no-ssl"
-
-  integrations = [
-		"${data.runscope_integration.slack.id}"
-  ]
-
-  initial_variables = {
-    var1 = "true"
-    var2 = "value2"
-  }
-
-  regions = ["us1", "eu1"]
-
-  remote_agent {
-      name = "test agent"
-	  uuid = "arbitrary-string"
-	}
-
-
-	retry_on_failure = true
-	webhooks = ["https://example.com"]
-  verify_ssl = false
-}
-
-resource "runscope_test" "test" {
-  bucket_id = "${runscope_bucket.bucket.id}"
-  name = "runscope test"
-  description = "This is a test test..."
-}
-
 resource "runscope_bucket" "bucket" {
-  name = "terraform-provider-test"
-  team_uuid = "%s"
+	name      = "terraform-provider-test"
+	team_uuid = "%s"
 }
 
-data "runscope_integration" "slack" {
-  team_uuid = "%s"
-  type = "slack"
+resource "runscope_environment" "environmentB" {
+	bucket_id = "${runscope_bucket.bucket.id}"
+	name      = "test-no-ssl"
+
+	verify_ssl = false
 }
 `

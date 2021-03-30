@@ -1,7 +1,6 @@
 package runscope
 
 import (
-	"bytes"
 	"fmt"
 	"log"
 	"strings"
@@ -24,15 +23,15 @@ func resourceRunscopeEnvironment() *schema.Resource {
 				Required: true,
 				ForceNew: true,
 			},
-			"test_id": {
-				Type:     schema.TypeString,
-				Optional: true,
-				ForceNew: true,
-			},
 			"name": {
 				Type:     schema.TypeString,
 				Required: true,
 				ForceNew: false,
+			},
+			"test_id": {
+				Type:     schema.TypeString,
+				Optional: true,
+				ForceNew: true,
 			},
 			"script": {
 				Type:     schema.TypeString,
@@ -98,35 +97,37 @@ func resourceRunscopeEnvironment() *schema.Resource {
 					Schema: map[string]*schema.Schema{
 						"notify_all": {
 							Type:     schema.TypeBool,
-							Required: true,
+							Optional: true,
+							Default:  false,
 						},
 						"notify_on": {
 							Type:     schema.TypeString,
-							Required: true,
+							Optional: true,
 							ValidateFunc: validation.StringInSlice([]string{
 								"all", "failures", "threshold", "switch",
 							}, false),
 						},
 						"notify_threshold": {
 							Type:     schema.TypeInt,
-							Required: true,
+							Optional: true,
+							Default:  0,
 						},
 						"recipient": {
 							Type:     schema.TypeSet,
-							Required: true,
+							Optional: true,
 							Elem: &schema.Resource{
 								Schema: map[string]*schema.Schema{
-									"name": {
-										Type:     schema.TypeString,
-										Optional: true,
-									},
 									"id": {
 										Type:     schema.TypeString,
-										Optional: true,
+										Required: true,
+									},
+									"name": {
+										Type:     schema.TypeString,
+										Computed: true,
 									},
 									"email": {
 										Type:     schema.TypeString,
-										Optional: true,
+										Computed: true,
 									},
 								},
 							},
@@ -146,15 +147,13 @@ func resourceEnvironmentCreate(d *schema.ResourceData, meta interface{}) error {
 	name := d.Get("name").(string)
 	log.Printf("[INFO] Creating environment with name: %s", name)
 
-	environment, err := createEnvironmentFromResourceData(d)
-	if err != nil {
-		return err
-	}
+	environment := expandEnvironment(d)
 	log.Printf("[DEBUG] environment create: %#v", environment)
 
 	var createdEnvironment *runscope.Environment
 	bucketID := d.Get("bucket_id").(string)
 
+	var err error
 	if testID, ok := d.GetOk("test_id"); ok {
 		createdEnvironment, err = client.CreateTestEnvironment(environment,
 			&runscope.Test{ID: testID.(string), Bucket: &runscope.Bucket{Key: bucketID}})
@@ -175,12 +174,10 @@ func resourceEnvironmentCreate(d *schema.ResourceData, meta interface{}) error {
 func resourceEnvironmentRead(d *schema.ResourceData, meta interface{}) error {
 	client := meta.(*runscope.Client)
 
-	environmentFromResource, err := createEnvironmentFromResourceData(d)
-	if err != nil {
-		return fmt.Errorf("Failed to read environment from resource data: %s", err)
-	}
+	environmentFromResource := expandEnvironment(d)
 
 	var environment *runscope.Environment
+	var err error
 	bucketID := d.Get("bucket_id").(string)
 	if testID, ok := d.GetOk("test_id"); ok {
 		environment, err = client.ReadTestEnvironment(
@@ -215,49 +212,33 @@ func resourceEnvironmentRead(d *schema.ResourceData, meta interface{}) error {
 }
 
 func resourceEnvironmentUpdate(d *schema.ResourceData, meta interface{}) error {
-	d.Partial(false)
-	environment, err := createEnvironmentFromResourceData(d)
+	environment := expandEnvironment(d)
+
+	client := meta.(*runscope.Client)
+	bucketID := d.Get("bucket_id").(string)
+	var err error
+	if testID, ok := d.GetOk("test_id"); ok {
+		_, err = client.UpdateTestEnvironment(
+			environment, &runscope.Test{ID: testID.(string), Bucket: &runscope.Bucket{Key: bucketID}})
+	} else {
+		_, err = client.UpdateSharedEnvironment(
+			environment, &runscope.Bucket{Key: bucketID})
+	}
 	if err != nil {
 		return fmt.Errorf("Error updating environment: %s", err)
 	}
 
-	if d.HasChange("name") ||
-		d.HasChange("script") ||
-		d.HasChange("preserve_cookies") ||
-		d.HasChange("initial_variables") ||
-		d.HasChange("integrations") ||
-		d.HasChange("regions") ||
-		d.HasChange("remote_agent") ||
-		d.HasChange("retry_on_failure") ||
-		d.HasChange("verify_ssl") ||
-		d.HasChange("webhooks") ||
-		d.HasChange("email") {
-		client := meta.(*runscope.Client)
-		bucketID := d.Get("bucket_id").(string)
-		if testID, ok := d.GetOk("test_id"); ok {
-			_, err = client.UpdateTestEnvironment(
-				environment, &runscope.Test{ID: testID.(string), Bucket: &runscope.Bucket{Key: bucketID}})
-		} else {
-			_, err = client.UpdateSharedEnvironment(
-				environment, &runscope.Bucket{Key: bucketID})
-		}
-		if err != nil {
-			return fmt.Errorf("Error updating environment: %s", err)
-		}
-	}
-
-	return nil
+	return resourceEnvironmentRead(d, meta)
 }
 
 func resourceEnvironmentDelete(d *schema.ResourceData, meta interface{}) error {
 	client := meta.(*runscope.Client)
 
-	environmentFromResource, err := createEnvironmentFromResourceData(d)
-	if err != nil {
-		return fmt.Errorf("Failed to read environment from resource data: %s", err)
-	}
+	environmentFromResource := expandEnvironment(d)
 
 	bucketID := d.Get("bucket_id").(string)
+	var err error
+
 	if testID, ok := d.GetOk("test_id"); ok {
 		log.Printf("[INFO] Deleting test environment with id: %s name: %s, from test %s",
 			environmentFromResource.ID, environmentFromResource.Name, testID.(string))
@@ -277,18 +258,12 @@ func resourceEnvironmentDelete(d *schema.ResourceData, meta interface{}) error {
 	return nil
 }
 
-func createEnvironmentFromResourceData(d *schema.ResourceData) (*runscope.Environment, error) {
-
+func expandEnvironment(d *schema.ResourceData) *runscope.Environment {
 	environment := runscope.NewEnvironment()
+
 	environment.ID = d.Id()
-
-	if attr, ok := d.GetOk("name"); ok {
-		environment.Name = attr.(string)
-	}
-
-	if attr, ok := d.GetOk("test_id"); ok {
-		environment.TestID = attr.(string)
-	}
+	environment.TestID = d.Get("test_id").(string)
+	environment.Name = d.Get("name").(string)
 
 	if attr, ok := d.GetOk("script"); ok {
 		environment.Script = attr.(string)
@@ -352,9 +327,7 @@ func createEnvironmentFromResourceData(d *schema.ResourceData) (*runscope.Enviro
 		environment.RetryOnFailure = attr.(bool)
 	}
 
-	if attr, ok := d.Get("verify_ssl").(bool); ok {
-		environment.VerifySsl = attr
-	}
+	environment.VerifySsl = d.Get("verify_ssl").(bool)
 
 	if attr, ok := d.GetOk("webhooks"); ok {
 		webhooks := []string{}
@@ -367,31 +340,38 @@ func createEnvironmentFromResourceData(d *schema.ResourceData) (*runscope.Enviro
 		environment.WebHooks = webhooks
 	}
 
-	if attr, ok := d.GetOk("email"); ok {
-		contacts := []*runscope.Contact{}
-		tmp := attr.([]interface{})
-		items := tmp[0].(map[string]interface{})
-		emailSettings := runscope.EmailSettings{
-			NotifyAll:       items["notify_all"].(bool),
-			NotifyOn:        items["notify_on"].(string),
-			NotifyThreshold: items["notify_threshold"].(int),
-		}
+	environment.EmailSettings = expandEmailSettings(d.Get("email"))
 
-		for _, x := range items["recipient"].(*schema.Set).List() {
-			item := x.(map[string]interface{})
-			contact := runscope.Contact{
-				Name:  item["name"].(string),
-				Email: item["email"].(string),
-				ID:    item["id"].(string),
-			}
+	return environment
+}
 
-			contacts = append(contacts, &contact)
-		}
-		emailSettings.Recipients = contacts
-		environment.EmailSettings = &emailSettings
+func expandEmailSettings(v interface{}) *runscope.EmailSettings {
+	es := &runscope.EmailSettings{}
+	if v == nil {
+		return es
 	}
 
-	return environment, nil
+	list := v.([]interface{})
+	if len(list) < 1 {
+		return es
+	}
+
+	m := list[0].(map[string]interface{})
+	es.NotifyAll = m["notify_all"].(bool)
+	es.NotifyOn = m["notify_on"].(string)
+	es.NotifyThreshold = m["notify_threshold"].(int)
+	es.Recipients = expandRecipients(m["recipient"])
+	return es
+}
+
+func expandRecipients(v interface{}) []*runscope.Contact {
+	contacts := make([]*runscope.Contact, 0)
+	for _, val := range v.(*schema.Set).List() {
+		contacts = append(contacts, &runscope.Contact{
+			ID: val.(map[string]interface{})["id"].(string),
+		})
+	}
+	return contacts
 }
 
 func readIntegrations(integrations []*runscope.EnvironmentIntegration) []map[string]interface{} {
@@ -436,10 +416,6 @@ func flattenEmailSettings(emailSettings *runscope.EmailSettings) interface{} {
 }
 
 func recipientsHash(v interface{}) int {
-	var buf bytes.Buffer
 	m := v.(map[string]interface{})
-	buf.WriteString(fmt.Sprintf("%s-", m["name"].(string)))
-	buf.WriteString(fmt.Sprintf("%s-", m["id"].(string)))
-	buf.WriteString(fmt.Sprintf("%s-", m["email"].(string)))
-	return schema.HashString(buf.String())
+	return schema.HashString(m["id"].(string))
 }

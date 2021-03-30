@@ -56,9 +56,12 @@ data "runscope_integration" "by_type" {
 `
 
 func TestAccDataSourceRunscopeIntegration_Filter(t *testing.T) {
-
 	teamID := os.Getenv("RUNSCOPE_TEAM_ID")
-	var integrationDesc = os.Getenv("RUNSCOPE_INTEGRATION_DESC")
+	integrationDesc, ok := os.LookupEnv("RUNSCOPE_INTEGRATION_DESC")
+	if !ok {
+		t.Skip("RUNSCOPE_INTEGRATION_DESC should be set")
+		return
+	}
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:  func() { testAccPreCheck(t) },
