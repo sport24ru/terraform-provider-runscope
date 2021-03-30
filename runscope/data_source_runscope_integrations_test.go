@@ -6,8 +6,8 @@ import (
 	"testing"
 
 	"github.com/ewilde/go-runscope"
-	"github.com/hashicorp/terraform-plugin-sdk/helper/resource"
-	"github.com/hashicorp/terraform-plugin-sdk/terraform"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/terraform"
 )
 
 func TestAccDataSourceRunscopeIntegrations_Basic(t *testing.T) {
@@ -108,6 +108,25 @@ func testAccCheckEnvironmentIntegrations(environment string, expected bool) reso
 }
 
 const testAccDataSourceRunscopeIntegrationsUsageConfig = `
+resource "runscope_environment" "environment_with_integrations" {
+  bucket_id    = runscope_bucket.bucket.id
+  name         = "test-environment-1"
+
+  integrations = data.runscope_integrations.slack.ids
+}
+
+resource "runscope_environment" "environment_no_integrations" {
+  bucket_id    = runscope_bucket.bucket.id
+  name         = "test-environment-2"
+
+  integrations = data.runscope_integrations.empty.ids
+}
+
+resource "runscope_bucket" "bucket" {
+	name = "terraform-provider-test"
+	team_uuid = "%[1]v"
+}
+
 data "runscope_integrations" "slack" {
 	team_uuid = "%[1]v"
 	filter {
@@ -123,24 +142,4 @@ data "runscope_integrations" "empty" {
 		values = ["unknown"]
 	}
 }
-
-resource "runscope_environment" "environment_with_integrations" {
-  bucket_id    = "${runscope_bucket.bucket.id}"
-  name         = "test-environment-1"
-
-  integrations = data.runscope_integrations.slack.ids
-}
-
-resource "runscope_environment" "environment_no_integrations" {
-  bucket_id    = "${runscope_bucket.bucket.id}"
-  name         = "test-environment-2"
-
-  integrations = data.runscope_integrations.empty.ids
-}
-
-resource "runscope_bucket" "bucket" {
-	name = "terraform-provider-test"
-	team_uuid = "%[1]v"
-}
-
 `

@@ -6,8 +6,8 @@ import (
 	"strings"
 
 	"github.com/ewilde/go-runscope"
-	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
-	"github.com/hashicorp/terraform-plugin-sdk/helper/validation"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 )
 
 func resourceRunscopeEnvironment() *schema.Resource {
@@ -202,7 +202,7 @@ func resourceEnvironmentRead(d *schema.ResourceData, meta interface{}) error {
 	d.Set("script", environment.Script)
 	d.Set("preserve_cookies", environment.PreserveCookies)
 	d.Set("initial_variables", environment.InitialVariables)
-	d.Set("integrations", readIntegrations(environment.Integrations))
+	d.Set("integrations", flattenIntegrations(environment.Integrations))
 	d.Set("retry_on_failure", environment.RetryOnFailure)
 	d.Set("verify_ssl", environment.VerifySsl)
 	d.Set("webhooks", environment.WebHooks)
@@ -340,19 +340,25 @@ func expandEnvironment(d *schema.ResourceData) *runscope.Environment {
 		environment.WebHooks = webhooks
 	}
 
-	environment.EmailSettings = expandEmailSettings(d.Get("email"))
+	environment.EmailSettings = expandEmailSettings(d.Get("email"), false)
 
 	return environment
 }
 
-func expandEmailSettings(v interface{}) *runscope.EmailSettings {
+func expandEmailSettings(v interface{}, emptyIsNil bool) *runscope.EmailSettings {
 	es := &runscope.EmailSettings{}
 	if v == nil {
+		if emptyIsNil {
+			return nil
+		}
 		return es
 	}
 
 	list := v.([]interface{})
 	if len(list) < 1 {
+		if emptyIsNil {
+			return nil
+		}
 		return es
 	}
 
@@ -361,6 +367,7 @@ func expandEmailSettings(v interface{}) *runscope.EmailSettings {
 	es.NotifyOn = m["notify_on"].(string)
 	es.NotifyThreshold = m["notify_threshold"].(int)
 	es.Recipients = expandRecipients(m["recipient"])
+
 	return es
 }
 
@@ -374,23 +381,21 @@ func expandRecipients(v interface{}) []*runscope.Contact {
 	return contacts
 }
 
-func readIntegrations(integrations []*runscope.EnvironmentIntegration) []map[string]interface{} {
-	result := make([]map[string]interface{}, 0, len(integrations))
+func flattenIntegrations(integrations []*runscope.EnvironmentIntegration) []interface{} {
+	result := []interface{}{}
+
 	for _, integration := range integrations {
-
-		item := map[string]interface{}{
-			"id":               integration.ID,
-			"integration_type": integration.IntegrationType,
-			"description":      integration.Description,
-		}
-
-		result = append(result, item)
+		result = append(result, integration.ID)
 	}
 
 	return result
 }
 
-func flattenEmailSettings(emailSettings *runscope.EmailSettings) interface{} {
+func flattenEmailSettings(emailSettings *runscope.EmailSettings) []interface{} {
+	if isDefaultEmailSettings(emailSettings) {
+		return nil
+	}
+
 	item := map[string]interface{}{
 		"notify_all":       emailSettings.NotifyAll,
 		"notify_on":        emailSettings.NotifyOn,
@@ -412,7 +417,11 @@ func flattenEmailSettings(emailSettings *runscope.EmailSettings) interface{} {
 		item["recipient"] = resultRecipients
 	}
 
-	return item
+	return []interface{}{item}
+}
+
+func isDefaultEmailSettings(e *runscope.EmailSettings) bool {
+	return e.NotifyAll == false && e.NotifyOn == "" && e.NotifyThreshold == 0 && len(e.Recipients) == 0
 }
 
 func recipientsHash(v interface{}) int {

@@ -5,7 +5,7 @@ import (
 	"log"
 
 	"github.com/ewilde/go-runscope"
-	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
 
 func dataSourceRunscopeIntegration() *schema.Resource {
@@ -78,7 +78,6 @@ func dataSourceRunscopeIntegrationRead(d *schema.ResourceData, meta interface{})
 	}
 
 	d.SetId(found.ID)
-	d.Set("id", found.ID)
 	d.Set("type", found.IntegrationType)
 	d.Set("description", found.Description)
 

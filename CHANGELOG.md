@@ -1,9 +1,13 @@
-## 1.0.0 (Unreleased)
+## 0.9.0 (Unreleased)
 
 BREAKING CHANGES:
 
 * Removed deprecated attributes `remote_agents` and `emails` of `runscope_environment`
   and `variables`, `assertions` and `headers` of `runscope_step`.
+* If `runscope_environment.email` omitted, email notification settings are resetting to defaults.
+* Recipient ID is required to configure `runscope_environment.email.recipient`.
+  `name` and `email` of `recipient` are computed.
+* Terraform Plugin SDK is updated to 2.4.3, so you need terraform >= 0.12 to use provider.
 
 ## 0.8.0 (March 29, 2021)
 

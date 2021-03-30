@@ -6,8 +6,8 @@ import (
 	"testing"
 
 	"github.com/ewilde/go-runscope"
-	"github.com/hashicorp/terraform-plugin-sdk/helper/resource"
-	"github.com/hashicorp/terraform-plugin-sdk/terraform"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/terraform"
 )
 
 func TestAccEnvironment_basic(t *testing.T) {
@@ -111,7 +111,7 @@ func TestAccEnvironment_update_email(t *testing.T) {
 				Config: fmt.Sprintf(testRunscopeEnvironmentMinimal, teamID),
 				Check: resource.ComposeTestCheckFunc(
 					testAccCheckEnvironmentExists("runscope_environment.environmentA", &environment),
-					testAccCheckEnvironmentEmail(&environment, false, "all", 1, 0),
+					testAccCheckEnvironmentEmail(&environment, false, "", 0, 0),
 				),
 			},
 		},
@@ -134,10 +134,6 @@ func TestAccEnvironment_email_recipient(t *testing.T) {
 		return
 	}
 
-	hash := recipientsHash(map[string]interface{}{
-		"id": recipientId,
-	})
-
 	environment := runscope.Environment{}
 
 	resource.Test(t, resource.TestCase{
@@ -155,7 +151,7 @@ func TestAccEnvironment_email_recipient(t *testing.T) {
 					resource.TestCheckResourceAttr("runscope_environment.environmentA", "email.0.notify_on", "all"),
 					resource.TestCheckResourceAttr("runscope_environment.environmentA", "email.0.notify_threshold", "1"),
 					resource.TestCheckResourceAttr("runscope_environment.environmentA", "email.0.recipient.#", "1"),
-					resource.TestCheckResourceAttr("runscope_environment.environmentA", fmt.Sprintf("email.0.recipient.%d.id", hash), recipientId),
+					resource.TestCheckResourceAttr("runscope_environment.environmentA", "email.0.recipient.0.id", recipientId),
 					testAccCheckEnvironmentRecipient(&environment, recipientId, recipientName, recipientEmail),
 				),
 			},

@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/ewilde/go-runscope"
-	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
 
 func resourceRunscopeStep() *schema.Resource {
@@ -424,12 +424,14 @@ func readAssertions(assertions []*runscope.Assertion) []map[string]interface{} {
 }
 
 func readHeaders(headers map[string][]string) []map[string]interface{} {
-	result := make([]map[string]interface{}, len(headers))
-	for key, header := range headers {
-		result = append(result, map[string]interface{}{
-			"header": key,
-			"value":  header,
-		})
+	result := make([]map[string]interface{}, 0)
+	for header, values := range headers {
+		for _, value := range values {
+			result = append(result, map[string]interface{}{
+				"header": header,
+				"value":  value,
+			})
+		}
 	}
 
 	return result
