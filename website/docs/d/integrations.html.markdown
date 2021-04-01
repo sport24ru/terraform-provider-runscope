@@ -37,4 +37,4 @@ Variables (`filter`) supports the following:
 ## Attributes Reference
 The following attributes are exported:
 
-* `id` - The unique identifier of the found integration.
+* `ids` - Set of identifiers of the found integrations.
