@@ -33,6 +33,7 @@ func Provider() *schema.Provider {
 		ResourcesMap: map[string]*schema.Resource{
 			"runscope_bucket":      resourceRunscopeBucket(),
 			"runscope_test":        resourceRunscopeTest(),
+			"runscope_test_v2":     resourceRunscopeTestV2(),
 			"runscope_environment": resourceRunscopeEnvironment(),
 			"runscope_schedule":    resourceRunscopeSchedule(),
 			"runscope_step":        resourceRunscopeStep(),
