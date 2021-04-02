@@ -19,7 +19,7 @@ Use the navigation to the left to read about the available resources.
 ```hcl
 # Configure the Runscope provider
 provider "runscope" {
-  access_token = "${var.access_token}"
+  access_token = var.access_token
 }
 
 # Create a bucket
@@ -32,7 +32,7 @@ resource "runscope_bucket" "main" {
 resource "runscope_test" "api" {
   name        = "api-test"
   description = "checks the api is up and running"
-  bucket_id   = "${runscope_bucket.main.id}"
+  bucket_id   = runscope_bucket.main.id
 }
 ```
 
