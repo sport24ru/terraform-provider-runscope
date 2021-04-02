@@ -1,16 +1,16 @@
 package runscope
 
 import (
-	"fmt"
-	"log"
+	"context"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
+	"github.com/terraform-providers/terraform-provider-runscope/internal/runscope"
 
-	"github.com/ewilde/go-runscope"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
 
 func dataSourceRunscopeIntegration() *schema.Resource {
 	return &schema.Resource{
-		Read: dataSourceRunscopeIntegrationRead,
+		ReadContext: dataSourceRunscopeIntegrationRead,
 
 		Schema: map[string]*schema.Schema{
 			"team_uuid": {
@@ -47,22 +47,20 @@ func dataSourceRunscopeIntegration() *schema.Resource {
 	}
 }
 
-func dataSourceRunscopeIntegrationRead(d *schema.ResourceData, meta interface{}) error {
-	client := meta.(*runscope.Client)
-
-	log.Printf("[INFO] Reading Runscope integration")
+func dataSourceRunscopeIntegrationRead(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
+	client := meta.(*providerConfig).client
 
 	searchType := d.Get("type").(string)
 	filters, filtersOk := d.GetOk("filter")
 
-	resp, err := client.ListIntegrations(d.Get("team_uuid").(string))
+	integrations, err := client.Integration.List(ctx, &runscope.IntegrationListOpts{TeamId: d.Get("team_uuid").(string)})
 	if err != nil {
-		return err
+		return diag.FromErr(err)
 	}
 
 	found := &runscope.Integration{}
-	for _, integration := range resp {
-		if integration.IntegrationType == searchType {
+	for _, integration := range integrations {
+		if integration.Type == searchType {
 			if filtersOk {
 				if !integrationFiltersTest(integration, filters.(*schema.Set)) {
 					continue
@@ -74,11 +72,11 @@ func dataSourceRunscopeIntegrationRead(d *schema.ResourceData, meta interface{})
 	}
 
 	if found == nil {
-		return fmt.Errorf("Unable to locate any integrations with the type: %s", searchType)
+		return diag.Errorf("Unable to locate any integrations with the type: %s", searchType)
 	}
 
-	d.SetId(found.ID)
-	d.Set("type", found.IntegrationType)
+	d.SetId(found.UUID)
+	d.Set("type", found.Type)
 	d.Set("description", found.Description)
 
 	return nil
@@ -92,11 +90,11 @@ func integrationFiltersTest(integration *runscope.Integration, filters *schema.S
 		for _, e := range m["values"].(*schema.Set).List() {
 			switch m["name"].(string) {
 			case "id":
-				if integration.ID == e {
+				if integration.UUID == e {
 					passed = true
 				}
 			case "type":
-				if integration.IntegrationType == e {
+				if integration.Type == e {
 					passed = true
 				}
 			default:

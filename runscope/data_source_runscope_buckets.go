@@ -1,16 +1,17 @@
 package runscope
 
 import (
-	"log"
+	"context"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
+	"github.com/terraform-providers/terraform-provider-runscope/internal/runscope"
 	"time"
 
-	"github.com/ewilde/go-runscope"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
 
 func dataSourceRunscopeBuckets() *schema.Resource {
 	return &schema.Resource{
-		Read: dataSourceRunscopeBucketsRead,
+		ReadContext: dataSourceRunscopeBucketsRead,
 
 		Schema: map[string]*schema.Schema{
 			"filter": {
@@ -40,24 +41,20 @@ func dataSourceRunscopeBuckets() *schema.Resource {
 	}
 }
 
-func dataSourceRunscopeBucketsRead(d *schema.ResourceData, meta interface{}) error {
-	client := meta.(*runscope.Client)
-
-	log.Printf("[INFO] Reading Runscope buckets")
+func dataSourceRunscopeBucketsRead(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
+	client := meta.(*providerConfig).client
 
 	filters, filtersOk := d.GetOk("filter")
 
-	resp, err := client.ListBuckets()
+	buckets, err := client.Bucket.List(ctx)
 	if err != nil {
-		return err
+		return diag.FromErr(err)
 	}
 
 	var keys []string
-	for _, bucket := range resp {
-		if filtersOk {
-			if !bucketFiltersTest(bucket, filters.(*schema.Set)) {
-				continue
-			}
+	for _, bucket := range buckets {
+		if filtersOk && !bucketFiltersTest(bucket, filters.(*schema.Set)) {
+			continue
 		}
 
 		keys = append(keys, bucket.Key)

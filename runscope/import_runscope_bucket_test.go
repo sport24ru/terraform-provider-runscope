@@ -9,16 +9,16 @@ import (
 )
 
 func TestAccImportRunscopeBucket(t *testing.T) {
-
-	teamID := os.Getenv("RUNSCOPE_TEAM_ID")
+	teamId := os.Getenv("RUNSCOPE_TEAM_ID")
+	bucketName := testAccRandomBucketName()
 
 	resource.Test(t, resource.TestCase{
-		PreCheck:     func() { testAccPreCheck(t) },
-		Providers:    testAccProviders,
-		CheckDestroy: testAccCheckBucketDestroy,
+		PreCheck:          func() { testAccPreCheck(t) },
+		ProviderFactories: testAccProviderFactories,
+		CheckDestroy:      testAccCheckBucketDestroy,
 		Steps: []resource.TestStep{
 			{
-				Config: fmt.Sprintf(testAccImportRunscopeBucketConfig, teamID),
+				Config: fmt.Sprintf(testAccImportRunscopeBucketConfig, bucketName, teamId),
 			},
 			{
 				ResourceName:      "runscope_bucket.test",
@@ -31,7 +31,7 @@ func TestAccImportRunscopeBucket(t *testing.T) {
 
 const testAccImportRunscopeBucketConfig = `
 resource "runscope_bucket" "test" {
-	team_uuid = "%s"
-	name = "integration-test-bucket"
+  name      = "%s"
+  team_uuid = "%s"
 }
 `

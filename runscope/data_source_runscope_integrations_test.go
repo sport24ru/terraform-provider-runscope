@@ -1,11 +1,12 @@
 package runscope
 
 import (
+	"context"
 	"fmt"
+	"github.com/terraform-providers/terraform-provider-runscope/internal/runscope"
 	"os"
 	"testing"
 
-	"github.com/ewilde/go-runscope"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/terraform"
 )
@@ -15,8 +16,8 @@ func TestAccDataSourceRunscopeIntegrations_Basic(t *testing.T) {
 	teamID := os.Getenv("RUNSCOPE_TEAM_ID")
 
 	resource.Test(t, resource.TestCase{
-		PreCheck:  func() { testAccPreCheck(t) },
-		Providers: testAccProviders,
+		PreCheck:          func() { testAccPreCheck(t) },
+		ProviderFactories: testAccProviderFactories,
 		Steps: []resource.TestStep{
 			{
 				Config: fmt.Sprintf(testAccDataSourceRunscopeIntegrationsConfig, teamID),
@@ -56,8 +57,8 @@ func TestAccDataSourceRunscopeIntegrations_usage(t *testing.T) {
 	teamID := os.Getenv("RUNSCOPE_TEAM_ID")
 
 	resource.Test(t, resource.TestCase{
-		PreCheck:  func() { testAccPreCheck(t) },
-		Providers: testAccProviders,
+		PreCheck:          func() { testAccPreCheck(t) },
+		ProviderFactories: testAccProviderFactories,
 		Steps: []resource.TestStep{
 			{
 				Config: fmt.Sprintf(testAccDataSourceRunscopeIntegrationsUsageConfig, teamID),
@@ -72,6 +73,8 @@ func TestAccDataSourceRunscopeIntegrations_usage(t *testing.T) {
 
 func testAccCheckEnvironmentIntegrations(environment string, expected bool) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
+		ctx := context.Background()
+
 		rs, ok := s.RootModule().Resources[environment]
 
 		if !ok {
@@ -82,25 +85,21 @@ func testAccCheckEnvironmentIntegrations(environment string, expected bool) reso
 			return fmt.Errorf("No Record ID is set")
 		}
 
-		client := testAccProvider.Meta().(*runscope.Client)
+		client := testAccProvider.Meta().(*providerConfig).client
 
-		var foundRecord *runscope.Environment
-		var err error
-
-		environment := new(runscope.Environment)
-		environment.ID = rs.Primary.ID
-		bucketID := rs.Primary.Attributes["bucket_id"]
-		foundRecord, err = client.ReadSharedEnvironment(environment,
-			&runscope.Bucket{Key: bucketID})
-
+		opts := runscope.EnvironmentGetOpts{
+			Id: rs.Primary.ID,
+		}
+		opts.BucketId = rs.Primary.Attributes["bucket_id"]
+		env, err := client.Environment.Get(ctx, &opts)
 		if err != nil {
 			return err
 		}
 
-		if len(foundRecord.Integrations) == 0 && expected {
+		if len(env.Integrations) == 0 && expected {
 			return fmt.Errorf("Expected environment to have integrations")
-		} else if len(foundRecord.Integrations) != 0 && !expected {
-			return fmt.Errorf("Expected environment not to have integrations, but had %d", len(foundRecord.Integrations))
+		} else if len(env.Integrations) != 0 && !expected {
+			return fmt.Errorf("Expected environment not to have integrations, but had %d", len(env.Integrations))
 		}
 
 		return nil

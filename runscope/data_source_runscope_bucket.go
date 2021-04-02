@@ -1,15 +1,15 @@
 package runscope
 
 import (
-	"log"
-
-	"github.com/ewilde/go-runscope"
+	"context"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+	"github.com/terraform-providers/terraform-provider-runscope/internal/runscope"
 )
 
 func dataSourceRunscopeBucket() *schema.Resource {
 	return &schema.Resource{
-		Read: dataSourceRunscopeBucketRead,
+		ReadContext: dataSourceRunscopeBucketRead,
 
 		Schema: map[string]*schema.Schema{
 			"key": {
@@ -28,19 +28,18 @@ func dataSourceRunscopeBucket() *schema.Resource {
 	}
 }
 
-func dataSourceRunscopeBucketRead(d *schema.ResourceData, meta interface{}) error {
-	client := meta.(*runscope.Client)
+func dataSourceRunscopeBucketRead(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
+	client := meta.(*providerConfig).client
 
-	log.Printf("[INFO] Reading Runscope bucket")
-
-	resp, err := client.ReadBucket(d.Get("key").(string))
+	opts := &runscope.BucketGetOpts{Key: d.Get("key").(string)}
+	bucket, err := client.Bucket.Get(ctx, opts)
 	if err != nil {
-		return err
+		return diag.FromErr(err)
 	}
 
-	d.SetId(resp.Key)
-	d.Set("name", resp.Name)
-	d.Set("team_uuid", resp.Team.ID)
+	d.SetId(bucket.Key)
+	d.Set("name", bucket.Name)
+	d.Set("team_uuid", bucket.Team.UUID)
 
 	return nil
 }

@@ -1,11 +1,12 @@
 package runscope
 
 import (
+	"context"
 	"fmt"
+	"github.com/terraform-providers/terraform-provider-runscope/internal/runscope"
 	"os"
 	"testing"
 
-	"github.com/ewilde/go-runscope"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/terraform"
 )
@@ -15,9 +16,9 @@ func TestAccTest_basic(t *testing.T) {
 	teamID := os.Getenv("RUNSCOPE_TEAM_ID")
 
 	resource.Test(t, resource.TestCase{
-		PreCheck:     func() { testAccPreCheck(t) },
-		Providers:    testAccProviders,
-		CheckDestroy: testAccCheckTestDestroy,
+		PreCheck:          func() { testAccPreCheck(t) },
+		ProviderFactories: testAccProviderFactories,
+		CheckDestroy:      testAccCheckTestDestroy,
 		Steps: []resource.TestStep{
 			{
 				Config: fmt.Sprintf(testRunscopeTestConfigA, teamID),
@@ -34,48 +35,54 @@ func TestAccTest_basic(t *testing.T) {
 }
 
 func testAccCheckTestDestroy(s *terraform.State) error {
-	client := testAccProvider.Meta().(*runscope.Client)
+	ctx := context.Background()
+	client := testAccProvider.Meta().(*providerConfig).client
 
 	for _, rs := range s.RootModule().Resources {
 		if rs.Type != "runscope_test" {
 			continue
 		}
 
-		_, err := client.ReadTest(&runscope.Test{ID: rs.Primary.ID, Bucket: &runscope.Bucket{Key: rs.Primary.Attributes["bucket_id"]}})
+		opts := runscope.TestDeleteOpts{}
+		opts.Id = rs.Primary.ID
+		opts.BucketId = rs.Primary.Attributes["bucket_id"]
 
-		if err == nil {
-			return fmt.Errorf("Record %s still exists", rs.Primary.ID)
+		if err := client.Test.Delete(ctx, opts); err == nil {
+			return fmt.Errorf("record %s still exists", rs.Primary.ID)
 		}
 	}
 
 	return nil
 }
 
-func testAccCheckTestExists(n string, test *runscope.Test) resource.TestCheckFunc {
+func testAccCheckTestExists(n string, t *runscope.Test) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
+		ctx := context.Background()
 		rs, ok := s.RootModule().Resources[n]
 
 		if !ok {
-			return fmt.Errorf("Not found: %s", n)
+			return fmt.Errorf("not found: %s", n)
 		}
 
 		if rs.Primary.ID == "" {
-			return fmt.Errorf("No Record ID is set")
+			return fmt.Errorf("no Record ID is set")
 		}
 
-		client := testAccProvider.Meta().(*runscope.Client)
+		client := testAccProvider.Meta().(*providerConfig).client
 
-		foundRecord, err := client.ReadTest(&runscope.Test{ID: rs.Primary.ID, Bucket: &runscope.Bucket{Key: rs.Primary.Attributes["bucket_id"]}})
-
+		opts := runscope.TestGetOpts{}
+		opts.Id = rs.Primary.ID
+		opts.BucketId = rs.Primary.Attributes["bucket_id"]
+		test, err := client.Test.Get(ctx, opts)
 		if err != nil {
 			return err
 		}
 
-		if foundRecord.ID != rs.Primary.ID {
-			return fmt.Errorf("Record not found")
+		if test.Id != rs.Primary.ID {
+			return fmt.Errorf("record not found")
 		}
 
-		test = foundRecord
+		*t = *test
 
 		return nil
 	}

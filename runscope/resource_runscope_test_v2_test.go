@@ -1,11 +1,12 @@
 package runscope
 
 import (
+	"context"
 	"fmt"
+	"github.com/terraform-providers/terraform-provider-runscope/internal/runscope"
 	"os"
 	"testing"
 
-	"github.com/ewilde/go-runscope"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/terraform"
 )
@@ -17,9 +18,9 @@ func TestAccTestV2_basic(t *testing.T) {
 	teamID := os.Getenv("RUNSCOPE_TEAM_ID")
 
 	resource.Test(t, resource.TestCase{
-		PreCheck:     func() { testAccPreCheck(t) },
-		Providers:    testAccProviders,
-		CheckDestroy: testAccCheckTestV2Destroy,
+		PreCheck:          func() { testAccPreCheck(t) },
+		ProviderFactories: testAccProviderFactories,
+		CheckDestroy:      testAccCheckTestV2Destroy,
 		Steps: []resource.TestStep{
 			{
 				Config: fmt.Sprintf(testRunscopeTestV2, teamID),
@@ -39,14 +40,21 @@ func TestAccTestV2_basic(t *testing.T) {
 }
 
 func testAccCheckTestV2Destroy(s *terraform.State) error {
-	client := testAccProvider.Meta().(*runscope.Client)
+	ctx := context.TODO()
+
+	client := testAccProvider.Meta().(*providerConfig).client
 
 	for _, rs := range s.RootModule().Resources {
-		if rs.Type != "runscope_test" {
+		if rs.Type != "runscope_test_v2" {
 			continue
 		}
 
-		_, err := client.ReadTest(&runscope.Test{ID: rs.Primary.ID, Bucket: &runscope.Bucket{Key: rs.Primary.Attributes["bucket_id"]}})
+		opts := runscope.TestGetOpts{
+			BucketId: rs.Primary.Attributes["bucket_id"],
+			Id:       rs.Primary.ID,
+		}
+
+		_, err := client.Test.Get(ctx, opts)
 
 		if err == nil {
 			return fmt.Errorf("Record %s still exists", rs.Primary.ID)
@@ -56,8 +64,9 @@ func testAccCheckTestV2Destroy(s *terraform.State) error {
 	return nil
 }
 
-func testAccCheckTestV2Exists(n string, test *runscope.Test) resource.TestCheckFunc {
+func testAccCheckTestV2Exists(n string, t *runscope.Test) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
+		ctx := context.Background()
 		rs, ok := s.RootModule().Resources[n]
 
 		if !ok {
@@ -68,19 +77,22 @@ func testAccCheckTestV2Exists(n string, test *runscope.Test) resource.TestCheckF
 			return fmt.Errorf("No Record ID is set")
 		}
 
-		client := testAccProvider.Meta().(*runscope.Client)
+		client := testAccProvider.Meta().(*providerConfig).client
 
-		foundRecord, err := client.ReadTest(&runscope.Test{ID: rs.Primary.ID, Bucket: &runscope.Bucket{Key: rs.Primary.Attributes["bucket_id"]}})
+		opts := runscope.TestGetOpts{}
+		opts.Id = rs.Primary.ID
+		opts.BucketId = rs.Primary.Attributes["bucket_id"]
+		test, err := client.Test.Get(ctx, opts)
 
 		if err != nil {
 			return err
 		}
 
-		if foundRecord.ID != rs.Primary.ID {
+		if test.Id != rs.Primary.ID {
 			return fmt.Errorf("Record not found")
 		}
 
-		*test = *foundRecord
+		*t = *test
 
 		return nil
 	}
@@ -88,8 +100,8 @@ func testAccCheckTestV2Exists(n string, test *runscope.Test) resource.TestCheckF
 
 func testAccCheckTestV2DefaultEnvId(test *runscope.Test, env *runscope.Environment) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
-		if test.DefaultEnvironmentID != env.ID {
-			return fmt.Errorf("default environment ID is %s, %s expected", test.DefaultEnvironmentID, env.ID)
+		if test.DefaultEnvironmentId != env.Id {
+			return fmt.Errorf("default environment ID is %s, %s expected", test.DefaultEnvironmentId, env.Id)
 		}
 		return nil
 	}

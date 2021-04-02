@@ -1,24 +1,27 @@
 package runscope
 
 import (
+	"context"
 	"fmt"
+	"github.com/terraform-providers/terraform-provider-runscope/internal/runscope"
 	"os"
 	"testing"
 
-	"github.com/ewilde/go-runscope"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/terraform"
 )
 
 func TestAccSchedule_basic(t *testing.T) {
-	teamID := os.Getenv("RUNSCOPE_TEAM_ID")
+	teamId := os.Getenv("RUNSCOPE_TEAM_ID")
+	bucketName := testAccRandomBucketName()
+
 	resource.Test(t, resource.TestCase{
-		PreCheck:     func() { testAccPreCheck(t) },
-		Providers:    testAccProviders,
-		CheckDestroy: testAccCheckScheduleDestroy,
+		PreCheck:          func() { testAccPreCheck(t) },
+		ProviderFactories: testAccProviderFactories,
+		CheckDestroy:      testAccCheckScheduleDestroy,
 		Steps: []resource.TestStep{
 			{
-				Config: fmt.Sprintf(testRunscopeScheduleConfigA, teamID),
+				Config: fmt.Sprintf(testRunscopeSchedule, bucketName, teamId),
 				Check: resource.ComposeTestCheckFunc(
 					testAccCheckScheduleExists("runscope_schedule.daily"),
 					resource.TestCheckResourceAttr(
@@ -31,19 +34,20 @@ func TestAccSchedule_basic(t *testing.T) {
 }
 
 func testAccCheckScheduleDestroy(s *terraform.State) error {
-	client := testAccProvider.Meta().(*runscope.Client)
+	ctx := context.Background()
+	client := testAccProvider.Meta().(*providerConfig).client
 
 	for _, rs := range s.RootModule().Resources {
 		if rs.Type != "runscope_schedule" {
 			continue
 		}
 
-		var err error
-		bucketID := rs.Primary.Attributes["bucket_id"]
-		testID := rs.Primary.Attributes["test_id"]
-		err = client.DeleteSchedule(&runscope.Schedule{ID: rs.Primary.ID}, bucketID, testID)
+		opts := &runscope.ScheduleDeleteOpts{}
+		opts.Id = rs.Primary.ID
+		opts.BucketId = rs.Primary.Attributes["bucket_id"]
+		opts.TestId = rs.Primary.Attributes["test_id"]
 
-		if err == nil {
+		if err := client.Schedule.Delete(ctx, opts); err == nil {
 			return fmt.Errorf("Record %s still exists", rs.Primary.ID)
 		}
 	}
@@ -53,6 +57,7 @@ func testAccCheckScheduleDestroy(s *terraform.State) error {
 
 func testAccCheckScheduleExists(n string) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
+		ctx := context.Background()
 		rs, ok := s.RootModule().Resources[n]
 
 		if !ok {
@@ -63,23 +68,19 @@ func testAccCheckScheduleExists(n string) resource.TestCheckFunc {
 			return fmt.Errorf("No Record ID is set")
 		}
 
-		client := testAccProvider.Meta().(*runscope.Client)
+		client := testAccProvider.Meta().(*providerConfig).client
 
-		var foundRecord *runscope.Schedule
-		var err error
+		opts := &runscope.ScheduleGetOpts{}
+		opts.Id = rs.Primary.ID
+		opts.BucketId = rs.Primary.Attributes["bucket_id"]
+		opts.TestId = rs.Primary.Attributes["test_id"]
 
-		schedule := new(runscope.Schedule)
-		schedule.ID = rs.Primary.ID
-		bucketID := rs.Primary.Attributes["bucket_id"]
-		testID := rs.Primary.Attributes["test_id"]
-
-		foundRecord, err = client.ReadSchedule(schedule, bucketID, testID)
-
+		schedule, err := client.Schedule.Get(ctx, opts)
 		if err != nil {
 			return err
 		}
 
-		if foundRecord.ID != rs.Primary.ID {
+		if schedule.Id != rs.Primary.ID {
 			return fmt.Errorf("Record not found")
 		}
 
@@ -87,33 +88,33 @@ func testAccCheckScheduleExists(n string) resource.TestCheckFunc {
 	}
 }
 
-const testRunscopeScheduleConfigA = `
-resource "runscope_schedule" "daily" {
-  bucket_id      = "${runscope_bucket.bucket.id}"
-  test_id        = "${runscope_test.test.id}"
-  interval       = "1d"
-  note           = "This is a daily schedule"
-  environment_id = "${runscope_environment.environment.id}"
+const testRunscopeSchedule = `
+resource "runscope_bucket" "bucket" {
+  name      = "%s"
+  team_uuid = "%s"
 }
 
 resource "runscope_test" "test" {
-  bucket_id   = "${runscope_bucket.bucket.id}"
+  bucket_id   = runscope_bucket.bucket.id
   name        = "runscope test"
   description = "This is a test test..."
 }
 
-resource "runscope_bucket" "bucket" {
-  name      = "terraform-provider-test"
-  team_uuid = "%s"
-}
-
 resource "runscope_environment" "environment" {
-  bucket_id = "${runscope_bucket.bucket.id}"
+  bucket_id = runscope_bucket.bucket.id
   name      = "test-environment"
 
   initial_variables = {
     var1 = "true"
     var2 = "value2"
   }
+}
+
+resource "runscope_schedule" "daily" {
+  bucket_id      = runscope_bucket.bucket.id
+  test_id        = runscope_test.test.id
+  environment_id = runscope_environment.environment.id
+  interval       = "1d"
+  note           = "This is a daily schedule"
 }
 `

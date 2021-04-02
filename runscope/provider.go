@@ -1,7 +1,10 @@
 package runscope
 
 import (
+	"context"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+	"github.com/terraform-providers/terraform-provider-runscope/internal/runscope"
 )
 
 // Provider returns a terraform.ResourceProvider.
@@ -39,14 +42,28 @@ func Provider() *schema.Provider {
 			"runscope_step":        resourceRunscopeStep(),
 		},
 
-		ConfigureFunc: providerConfigure,
+		ConfigureContextFunc: providerConfigure,
 	}
 }
 
-func providerConfigure(d *schema.ResourceData) (interface{}, error) {
-	config := config{
-		AccessToken: d.Get("access_token").(string),
-		APIURL:      d.Get("api_url").(string),
+type providerConfig struct {
+	client *runscope.Client
+}
+
+func providerConfigure(_ context.Context, d *schema.ResourceData) (interface{}, diag.Diagnostics) {
+	token := d.Get("access_token").(string)
+	endpoint := d.Get("api_url").(string)
+
+	client := runscope.NewClient(runscope.WithToken(token), runscope.WithEndpoint(endpoint))
+
+	return &providerConfig{
+		client: client,
+	}, nil
+}
+
+func isNotFound(err error) bool {
+	if runscopeErr, ok := err.(runscope.Error); ok {
+		return runscopeErr.Status() == 404
 	}
-	return config.client()
+	return false
 }

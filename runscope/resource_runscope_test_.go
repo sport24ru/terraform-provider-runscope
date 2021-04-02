@@ -4,22 +4,23 @@
 package runscope
 
 import (
+	"context"
 	"fmt"
-	"log"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
+	"github.com/terraform-providers/terraform-provider-runscope/internal/runscope"
 	"strings"
 
-	"github.com/ewilde/go-runscope"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
 
 func resourceRunscopeTest() *schema.Resource {
 	return &schema.Resource{
-		Create: resourceTestCreate,
-		Read:   resourceTestRead,
-		Update: resourceTestUpdate,
-		Delete: resourceTestDelete,
+		CreateContext: resourceTestCreate,
+		ReadContext:   resourceTestRead,
+		UpdateContext: resourceTestUpdate,
+		DeleteContext: resourceTestDelete,
 		Importer: &schema.ResourceImporter{
-			State: func(d *schema.ResourceData, meta interface{}) ([]*schema.ResourceData, error) {
+			StateContext: func(_ context.Context, d *schema.ResourceData, meta interface{}) ([]*schema.ResourceData, error) {
 				parts := strings.SplitN(d.Id(), "/", 2)
 				if len(parts) < 2 {
 					return nil, fmt.Errorf("test ID for import should be in format bucket_id/test_id")
@@ -56,104 +57,77 @@ func resourceRunscopeTest() *schema.Resource {
 	}
 }
 
-func resourceTestCreate(d *schema.ResourceData, meta interface{}) error {
-	client := meta.(*runscope.Client)
+func resourceTestCreate(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
+	client := meta.(*providerConfig).client
 
-	name := d.Get("name").(string)
-	log.Printf("[INFO] Creating test with name: %s", name)
+	opts := runscope.TestCreateOpts{}
+	opts.BucketId = d.Get("bucket_id").(string)
+	opts.Name = d.Get("name").(string)
+	opts.Description = d.Get("description").(string)
 
-	test, err := createTestFromResourceData(d)
+	test, err := client.Test.Create(ctx, opts)
 	if err != nil {
-		return fmt.Errorf("Failed to create test: %s", err)
+		return diag.Errorf("Failed to create test: %s", err)
 	}
 
-	log.Printf("[DEBUG] test create: %#v", test)
+	d.SetId(test.Id)
 
-	createdTest, err := client.CreateTest(test)
-	if err != nil {
-		return fmt.Errorf("Failed to create test: %s", err)
-	}
-
-	d.SetId(createdTest.ID)
-	log.Printf("[INFO] test ID: %s", d.Id())
-
-	return resourceTestRead(d, meta)
+	return resourceTestV2Read(ctx, d, meta)
 }
 
-func resourceTestRead(d *schema.ResourceData, meta interface{}) error {
-	client := meta.(*runscope.Client)
+func resourceTestRead(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
+	client := meta.(*providerConfig).client
 
-	testFromResource, err := createTestFromResourceData(d)
-	if err != nil {
-		return fmt.Errorf("Error reading test: %s", err)
+	opts := runscope.TestGetOpts{
+		BucketId: d.Get("bucket_id").(string),
+		Id:       d.Id(),
 	}
 
-	test, err := client.ReadTest(testFromResource)
+	test, err := client.Test.Get(ctx, opts)
 	if err != nil {
-		if strings.Contains(err.Error(), "404") || strings.Contains(err.Error(), "403") {
+		if isNotFound(err) {
 			d.SetId("")
 			return nil
 		}
 
-		return fmt.Errorf("Couldn't find test: %s", err)
+		return diag.Errorf("Couldn't read test: %s", err)
 	}
 
 	d.Set("name", test.Name)
 	d.Set("description", test.Description)
-	d.Set("default_environment_id", test.DefaultEnvironmentID)
+	d.Set("default_environment_id", test.DefaultEnvironmentId)
 	return nil
 }
 
-func resourceTestUpdate(d *schema.ResourceData, meta interface{}) error {
-	d.Partial(false)
-	testFromResource, err := createTestFromResourceData(d)
+func resourceTestUpdate(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
+	client := meta.(*providerConfig).client
+
+	opts := runscope.TestUpdateOpts{}
+	opts.Id = d.Id()
+	opts.BucketId = d.Get("bucket_id").(string)
+	opts.Name = d.Get("name").(string)
+	opts.Description = d.Get("description").(string)
+	opts.DefaultEnvironmentId = d.Get("default_environment_id").(string)
+
+	_, err := client.Test.Update(ctx, opts)
 	if err != nil {
-		return fmt.Errorf("Error updating test: %s", err)
+		return diag.Errorf("Error updating test: %s", err)
 	}
 
-	if d.HasChange("description") {
-		client := meta.(*runscope.Client)
-		_, err = client.UpdateTest(testFromResource)
+	return resourceTestV2Read(ctx, d, meta)
+}
 
-		if err != nil {
-			return fmt.Errorf("Error updating test: %s", err)
-		}
+func resourceTestDelete(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
+	client := meta.(*providerConfig).client
+
+	opts := runscope.TestDeleteOpts{
+		Id:       d.Id(),
+		BucketId: d.Get("bucket_id").(string),
+	}
+
+	if err := client.Test.Delete(ctx, opts); err != nil {
+		return diag.Errorf("Error deleting test: %s", err)
 	}
 
 	return nil
-}
-
-func resourceTestDelete(d *schema.ResourceData, meta interface{}) error {
-	client := meta.(*runscope.Client)
-
-	test, err := createTestFromResourceData(d)
-	if err != nil {
-		return fmt.Errorf("Error deleting test: %s", err)
-	}
-	log.Printf("[INFO] Deleting test with id: %s name: %s", test.ID, test.Name)
-
-	if err := client.DeleteTest(test); err != nil {
-		return fmt.Errorf("Error deleting test: %s", err)
-	}
-
-	return nil
-}
-
-func createTestFromResourceData(d *schema.ResourceData) (*runscope.Test, error) {
-
-	test := runscope.NewTest()
-	test.ID = d.Id()
-	if attr, ok := d.GetOk("bucket_id"); ok {
-		test.Bucket.Key = attr.(string)
-	}
-
-	if attr, ok := d.GetOk("name"); ok {
-		test.Name = attr.(string)
-	}
-
-	if attr, ok := d.GetOk("description"); ok {
-		test.Description = attr.(string)
-	}
-
-	return test, nil
 }

@@ -8,3 +8,4 @@ pkg
 .DS_Store
 dist
 .vscode
+*.private.env.json

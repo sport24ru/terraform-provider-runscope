@@ -1,11 +1,12 @@
 package runscope
 
 import (
+	"context"
 	"fmt"
+	"github.com/terraform-providers/terraform-provider-runscope/internal/runscope"
 	"os"
 	"testing"
 
-	"github.com/ewilde/go-runscope"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/terraform"
 )
@@ -14,9 +15,9 @@ func TestAccEnvironment_basic(t *testing.T) {
 	teamId := os.Getenv("RUNSCOPE_TEAM_ID")
 	environment := runscope.Environment{}
 	resource.Test(t, resource.TestCase{
-		PreCheck:     func() { testAccPreCheck(t) },
-		Providers:    testAccProviders,
-		CheckDestroy: testAccCheckEnvironmentDestroy,
+		PreCheck:          func() { testAccPreCheck(t) },
+		ProviderFactories: testAccProviderFactories,
+		CheckDestroy:      testAccCheckEnvironmentDestroy,
 		Steps: []resource.TestStep{
 			{
 				Config: fmt.Sprintf(testRunscopeEnvironmentMinimal, teamId),
@@ -58,9 +59,9 @@ func TestAccEnvironment_email(t *testing.T) {
 	teamID := os.Getenv("RUNSCOPE_TEAM_ID")
 	environment := runscope.Environment{}
 	resource.Test(t, resource.TestCase{
-		PreCheck:     func() { testAccPreCheck(t) },
-		Providers:    testAccProviders,
-		CheckDestroy: testAccCheckEnvironmentDestroy,
+		PreCheck:          func() { testAccPreCheck(t) },
+		ProviderFactories: testAccProviderFactories,
+		CheckDestroy:      testAccCheckEnvironmentDestroy,
 		Steps: []resource.TestStep{
 			{
 				Config: fmt.Sprintf(testRunscopeEnvironmentConfigWithEmail, teamID),
@@ -89,9 +90,9 @@ func TestAccEnvironment_update_email(t *testing.T) {
 
 	environment := runscope.Environment{}
 	resource.Test(t, resource.TestCase{
-		PreCheck:     func() { testAccPreCheck(t) },
-		Providers:    testAccProviders,
-		CheckDestroy: testAccCheckEnvironmentDestroy,
+		PreCheck:          func() { testAccPreCheck(t) },
+		ProviderFactories: testAccProviderFactories,
+		CheckDestroy:      testAccCheckEnvironmentDestroy,
 		Steps: []resource.TestStep{
 			{
 				Config: fmt.Sprintf(testRunscopeEnvironmentMinimal, teamID),
@@ -137,9 +138,9 @@ func TestAccEnvironment_email_recipient(t *testing.T) {
 	environment := runscope.Environment{}
 
 	resource.Test(t, resource.TestCase{
-		PreCheck:     func() { testAccPreCheck(t) },
-		Providers:    testAccProviders,
-		CheckDestroy: testAccCheckEnvironmentDestroy,
+		PreCheck:          func() { testAccPreCheck(t) },
+		ProviderFactories: testAccProviderFactories,
+		CheckDestroy:      testAccCheckEnvironmentDestroy,
 		Steps: []resource.TestStep{
 			{
 				Config: fmt.Sprintf(testRunscopeEnvironmentConfigWithEmailRecipient, teamId, recipientId),
@@ -163,9 +164,9 @@ func TestAccEnvironment_do_not_verify_ssl(t *testing.T) {
 	teamID := os.Getenv("RUNSCOPE_TEAM_ID")
 	environment := runscope.Environment{}
 	resource.Test(t, resource.TestCase{
-		PreCheck:     func() { testAccPreCheck(t) },
-		Providers:    testAccProviders,
-		CheckDestroy: testAccCheckEnvironmentDestroy,
+		PreCheck:          func() { testAccPreCheck(t) },
+		ProviderFactories: testAccProviderFactories,
+		CheckDestroy:      testAccCheckEnvironmentDestroy,
 		Steps: []resource.TestStep{
 			{
 				Config: fmt.Sprintf(testRunscopeEnvironmentConfigB, teamID),
@@ -181,26 +182,21 @@ func TestAccEnvironment_do_not_verify_ssl(t *testing.T) {
 }
 
 func testAccCheckEnvironmentDestroy(s *terraform.State) error {
-	client := testAccProvider.Meta().(*runscope.Client)
+	ctx := context.Background()
+	client := testAccProvider.Meta().(*providerConfig).client
 
 	for _, rs := range s.RootModule().Resources {
 		if rs.Type != "runscope_environment" {
 			continue
 		}
 
-		var err error
-		bucketID := rs.Primary.Attributes["bucket_id"]
-		testID := rs.Primary.Attributes["test_id"]
-		if testID != "" {
-			err = client.DeleteEnvironment(&runscope.Environment{ID: rs.Primary.ID},
-				&runscope.Bucket{Key: bucketID})
-		} else {
-			err = client.DeleteEnvironment(&runscope.Environment{ID: rs.Primary.ID},
-				&runscope.Bucket{Key: bucketID})
-		}
+		opts := runscope.EnvironmentDeleteOpts{}
+		opts.Id = rs.Primary.ID
+		opts.BucketId = rs.Primary.Attributes["bucket_id"]
+		opts.TestId = rs.Primary.Attributes["test_id"]
 
-		if err == nil {
-			return fmt.Errorf("Record %s still exists", rs.Primary.ID)
+		if err := client.Environment.Delete(ctx, &opts); err == nil {
+			return fmt.Errorf("record %s still exists", rs.Primary.ID)
 		}
 	}
 
@@ -209,44 +205,34 @@ func testAccCheckEnvironmentDestroy(s *terraform.State) error {
 
 func testAccCheckEnvironmentExists(n string, e *runscope.Environment) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
+		ctx := context.Background()
 		rs, ok := s.RootModule().Resources[n]
 
 		if !ok {
-			return fmt.Errorf("Not found: %s", n)
+			return fmt.Errorf("not found: %s", n)
 		}
 
 		if rs.Primary.ID == "" {
-			return fmt.Errorf("No Record ID is set")
+			return fmt.Errorf("no Record ID is set")
 		}
 
-		client := testAccProvider.Meta().(*runscope.Client)
+		client := testAccProvider.Meta().(*providerConfig).client
 
-		var foundRecord *runscope.Environment
-		var err error
+		opts := runscope.EnvironmentGetOpts{}
+		opts.Id = rs.Primary.ID
+		opts.BucketId = rs.Primary.Attributes["bucket_id"]
+		opts.TestId = rs.Primary.Attributes["test_id"]
 
-		environment := new(runscope.Environment)
-		environment.ID = rs.Primary.ID
-		bucketID := rs.Primary.Attributes["bucket_id"]
-		testID := rs.Primary.Attributes["test_id"]
-		if testID != "" {
-			foundRecord, err = client.ReadTestEnvironment(environment,
-				&runscope.Test{
-					ID:     testID,
-					Bucket: &runscope.Bucket{Key: bucketID}})
-		} else {
-			foundRecord, err = client.ReadSharedEnvironment(environment,
-				&runscope.Bucket{Key: bucketID})
-		}
-
+		environment, err := client.Environment.Get(ctx, &opts)
 		if err != nil {
 			return err
 		}
 
-		if foundRecord.ID != rs.Primary.ID {
-			return fmt.Errorf("Record not found")
+		if environment.Id != rs.Primary.ID {
+			return fmt.Errorf("record not found")
 		}
 
-		*e = *foundRecord
+		*e = *environment
 
 		return nil
 	}
@@ -254,17 +240,17 @@ func testAccCheckEnvironmentExists(n string, e *runscope.Environment) resource.T
 
 func testAccCheckEnvironmentEmail(e *runscope.Environment, expectedNotifyAll bool, expectedNotifyOn string, expectedNotifyThreshold int, expectedNumRecipients int) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
-		if e.EmailSettings.NotifyAll != expectedNotifyAll {
-			return fmt.Errorf("Expected NotifyAll '%v', got '%v'", expectedNotifyAll, e.EmailSettings.NotifyAll)
+		if e.Emails.NotifyAll != expectedNotifyAll {
+			return fmt.Errorf("expected NotifyAll '%v', got '%v'", expectedNotifyAll, e.Emails.NotifyAll)
 		}
-		if e.EmailSettings.NotifyOn != expectedNotifyOn {
-			return fmt.Errorf("Expected NotifyOn '%s', got '%s'", expectedNotifyOn, e.EmailSettings.NotifyOn)
+		if e.Emails.NotifyOn != expectedNotifyOn {
+			return fmt.Errorf("expected NotifyOn '%s', got '%s'", expectedNotifyOn, e.Emails.NotifyOn)
 		}
-		if e.EmailSettings.NotifyThreshold != expectedNotifyThreshold {
-			return fmt.Errorf("Expected NotifyThreshold '%d', got '%d'", expectedNotifyThreshold, e.EmailSettings.NotifyThreshold)
+		if e.Emails.NotifyThreshold != expectedNotifyThreshold {
+			return fmt.Errorf("expected NotifyThreshold '%d', got '%d'", expectedNotifyThreshold, e.Emails.NotifyThreshold)
 		}
-		if len(e.EmailSettings.Recipients) != expectedNumRecipients {
-			return fmt.Errorf("Expected '%d' recipients, got '%d'", expectedNumRecipients, len(e.EmailSettings.Recipients))
+		if len(e.Emails.Recipients) != expectedNumRecipients {
+			return fmt.Errorf("expected '%d' recipients, got '%d'", expectedNumRecipients, len(e.Emails.Recipients))
 		}
 		return nil
 	}
@@ -272,17 +258,17 @@ func testAccCheckEnvironmentEmail(e *runscope.Environment, expectedNotifyAll boo
 
 func testAccCheckEnvironmentRecipient(e *runscope.Environment, expectedId string, expectedName string, expectedEmail string) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
-		id := e.EmailSettings.Recipients[0].ID
+		id := e.Emails.Recipients[0].Id
 		if id != expectedId {
-			return fmt.Errorf("Expected recipient ID '%s', got '%s'", expectedId, id)
+			return fmt.Errorf("expected recipient ID '%s', got '%s'", expectedId, id)
 		}
-		name := e.EmailSettings.Recipients[0].Name
+		name := e.Emails.Recipients[0].Name
 		if name != expectedName {
-			return fmt.Errorf("Expected recipient name '%s', got '%s'", expectedName, name)
+			return fmt.Errorf("expected recipient name '%s', got '%s'", expectedName, name)
 		}
-		email := e.EmailSettings.Recipients[0].Email
+		email := e.Emails.Recipients[0].Email
 		if email != expectedEmail {
-			return fmt.Errorf("Expected recipient email '%s', got '%s'", expectedEmail, email)
+			return fmt.Errorf("expected recipient email '%s', got '%s'", expectedEmail, email)
 		}
 
 		return nil

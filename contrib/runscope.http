@@ -1,0 +1,26 @@
+### Create bucket
+POST https://api.runscope.com/buckets?name=terraform-provider-staging&team_uuid={{ team_uuid }}
+Authorization: Bearer {{api_token}}
+
+> {% client.global.set("bucket_id", response.body.data.key); %}
+
+### List buckets
+GET https://api.runscope.com/buckets
+Authorization: Bearer {{api_token}}
+
+### Create test
+POST https://api.runscope.com/buckets/{{bucket_id}}/tests
+Authorization: Bearer {{api_token}}
+Content-Type: application/json
+
+{"name": "Sample Name","description": "My test description"}
+
+> {% client.global.set("test_id", response.body.data.id); %}
+
+### Delete test
+DELETE https://api.runscope.com/buckets/{{bucket_id}}/tests/{{test_id}}
+Authorization: Bearer {{api_token}}
+
+### Delete bucket
+DELETE https://api.runscope.com/buckets/{{bucket_id}}
+Authorization: Bearer {{api_token}}

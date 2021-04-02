@@ -1,21 +1,19 @@
 package runscope
 
 import (
-	"fmt"
-	"log"
-	"strings"
-
-	"github.com/ewilde/go-runscope"
+	"context"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
+	"github.com/terraform-providers/terraform-provider-runscope/internal/runscope"
 )
 
 func resourceRunscopeEnvironment() *schema.Resource {
 	return &schema.Resource{
-		Create: resourceEnvironmentCreate,
-		Read:   resourceEnvironmentRead,
-		Update: resourceEnvironmentUpdate,
-		Delete: resourceEnvironmentDelete,
+		CreateContext: resourceEnvironmentCreate,
+		ReadContext:   resourceEnvironmentRead,
+		UpdateContext: resourceEnvironmentUpdate,
+		DeleteContext: resourceEnvironmentDelete,
 
 		Schema: map[string]*schema.Schema{
 			"bucket_id": {
@@ -23,15 +21,15 @@ func resourceRunscopeEnvironment() *schema.Resource {
 				Required: true,
 				ForceNew: true,
 			},
-			"name": {
-				Type:     schema.TypeString,
-				Required: true,
-				ForceNew: false,
-			},
 			"test_id": {
 				Type:     schema.TypeString,
 				Optional: true,
 				ForceNew: true,
+			},
+			"name": {
+				Type:     schema.TypeString,
+				Required: true,
+				ForceNew: false,
 			},
 			"script": {
 				Type:     schema.TypeString,
@@ -141,290 +139,181 @@ func resourceRunscopeEnvironment() *schema.Resource {
 	}
 }
 
-func resourceEnvironmentCreate(d *schema.ResourceData, meta interface{}) error {
-	client := meta.(*runscope.Client)
+func resourceEnvironmentCreate(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
+	client := meta.(*providerConfig).client
 
-	name := d.Get("name").(string)
-	log.Printf("[INFO] Creating environment with name: %s", name)
-
-	environment := expandEnvironment(d)
-	log.Printf("[DEBUG] environment create: %#v", environment)
-
-	var createdEnvironment *runscope.Environment
-	bucketID := d.Get("bucket_id").(string)
-
-	var err error
-	if testID, ok := d.GetOk("test_id"); ok {
-		createdEnvironment, err = client.CreateTestEnvironment(environment,
-			&runscope.Test{ID: testID.(string), Bucket: &runscope.Bucket{Key: bucketID}})
+	opts := runscope.EnvironmentCreateOpts{}
+	expandEnvironmentUriOpts(d, &opts.EnvironmentUriOpts)
+	expandEnvironmentBase(d, &opts.EnvironmentBase)
+	if env, err := client.Environment.Create(ctx, &opts); err != nil {
+		return diag.Errorf("Couldn't create environment: %s", err)
 	} else {
-		createdEnvironment, err = client.CreateSharedEnvironment(environment,
-			&runscope.Bucket{Key: bucketID})
-	}
-	if err != nil {
-		return fmt.Errorf("Failed to create environment: %s", err)
+		d.SetId(env.Id)
 	}
 
-	d.SetId(createdEnvironment.ID)
-	log.Printf("[INFO] environment ID: %s", d.Id())
-
-	return resourceEnvironmentRead(d, meta)
+	return resourceEnvironmentRead(ctx, d, meta)
 }
 
-func resourceEnvironmentRead(d *schema.ResourceData, meta interface{}) error {
-	client := meta.(*runscope.Client)
+func resourceEnvironmentRead(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
+	client := meta.(*providerConfig).client
 
-	environmentFromResource := expandEnvironment(d)
-
-	var environment *runscope.Environment
-	var err error
-	bucketID := d.Get("bucket_id").(string)
-	if testID, ok := d.GetOk("test_id"); ok {
-		environment, err = client.ReadTestEnvironment(
-			environmentFromResource, &runscope.Test{ID: testID.(string), Bucket: &runscope.Bucket{Key: bucketID}})
-	} else {
-		environment, err = client.ReadSharedEnvironment(
-			environmentFromResource, &runscope.Bucket{Key: bucketID})
+	opts := runscope.EnvironmentGetOpts{
+		Id: d.Id(),
+	}
+	opts.BucketId = d.Get("bucket_id").(string)
+	if v, ok := d.GetOk("test_id"); ok {
+		opts.TestId = v.(string)
 	}
 
+	env, err := client.Environment.Get(ctx, &opts)
 	if err != nil {
-		if strings.Contains(err.Error(), "404") || strings.Contains(err.Error(), "403") {
+		if isNotFound(err) {
 			d.SetId("")
 			return nil
 		}
 
-		return fmt.Errorf("Couldn't find environment: %s", err)
+		return diag.Errorf("Couldn't read environment: %s", err)
 	}
 
-	d.Set("bucket_id", bucketID)
-	d.Set("test_id", d.Get("test_id").(string))
-	d.Set("name", environment.Name)
-	d.Set("script", environment.Script)
-	d.Set("preserve_cookies", environment.PreserveCookies)
-	d.Set("initial_variables", environment.InitialVariables)
-	d.Set("integrations", flattenIntegrations(environment.Integrations))
-	d.Set("retry_on_failure", environment.RetryOnFailure)
-	d.Set("verify_ssl", environment.VerifySsl)
-	d.Set("webhooks", environment.WebHooks)
-
-	d.Set("email", flattenEmailSettings(environment.EmailSettings))
-	return nil
-}
-
-func resourceEnvironmentUpdate(d *schema.ResourceData, meta interface{}) error {
-	environment := expandEnvironment(d)
-
-	client := meta.(*runscope.Client)
-	bucketID := d.Get("bucket_id").(string)
-	var err error
-	if testID, ok := d.GetOk("test_id"); ok {
-		_, err = client.UpdateTestEnvironment(
-			environment, &runscope.Test{ID: testID.(string), Bucket: &runscope.Bucket{Key: bucketID}})
-	} else {
-		_, err = client.UpdateSharedEnvironment(
-			environment, &runscope.Bucket{Key: bucketID})
-	}
-	if err != nil {
-		return fmt.Errorf("Error updating environment: %s", err)
-	}
-
-	return resourceEnvironmentRead(d, meta)
-}
-
-func resourceEnvironmentDelete(d *schema.ResourceData, meta interface{}) error {
-	client := meta.(*runscope.Client)
-
-	environmentFromResource := expandEnvironment(d)
-
-	bucketID := d.Get("bucket_id").(string)
-	var err error
-
-	if testID, ok := d.GetOk("test_id"); ok {
-		log.Printf("[INFO] Deleting test environment with id: %s name: %s, from test %s",
-			environmentFromResource.ID, environmentFromResource.Name, testID.(string))
-		err = client.DeleteEnvironment(
-			environmentFromResource, &runscope.Bucket{Key: bucketID})
-	} else {
-		log.Printf("[INFO] Deleting shared environment with id: %s name: %s",
-			environmentFromResource.ID, environmentFromResource.Name)
-		err = client.DeleteEnvironment(
-			environmentFromResource, &runscope.Bucket{Key: bucketID})
-	}
-
-	if err != nil {
-		return fmt.Errorf("Error deleting environment: %s", err)
+	d.Set("bucket_id", opts.BucketId)
+	d.Set("test_id", opts.TestId)
+	d.Set("name", env.Name)
+	d.Set("script", env.Script)
+	d.Set("preserve_cookies", env.PreserveCookies)
+	d.Set("initial_variables", env.InitialVariables)
+	d.Set("integrations", env.Integrations)
+	d.Set("retry_on_failure", env.RetryOnFailure)
+	d.Set("verify_ssl", env.VerifySSL)
+	d.Set("webhooks", env.Webhooks)
+	if !env.Emails.IsDefault() {
+		d.Set("email", flattenEmails(env.Emails))
 	}
 
 	return nil
 }
 
-func expandEnvironment(d *schema.ResourceData) *runscope.Environment {
-	environment := runscope.NewEnvironment()
+func resourceEnvironmentUpdate(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
+	client := meta.(*providerConfig).client
 
-	environment.ID = d.Id()
-	environment.TestID = d.Get("test_id").(string)
-	environment.Name = d.Get("name").(string)
+	opts := runscope.EnvironmentUpdateOpts{}
+	expandEnvironmentGetOpts(d, &opts.EnvironmentGetOpts)
+	expandEnvironmentBase(d, &opts.EnvironmentBase)
 
-	if attr, ok := d.GetOk("script"); ok {
-		environment.Script = attr.(string)
+	if _, err := client.Environment.Update(ctx, &opts); err != nil {
+		return diag.Errorf("Couldn't update environment: %s", err)
 	}
 
-	if attr, ok := d.GetOk("preserve_cookies"); ok {
-		environment.PreserveCookies = attr.(bool)
-	}
-
-	if attr, ok := d.GetOk("initial_variables"); ok {
-		variablesRaw := attr.(map[string]interface{})
-		variables := map[string]string{}
-		for k, v := range variablesRaw {
-			variables[k] = v.(string)
-		}
-
-		environment.InitialVariables = variables
-	}
-
-	if attr, ok := d.GetOk("integrations"); ok {
-		integrations := []*runscope.EnvironmentIntegration{}
-		items := attr.(*schema.Set)
-		for _, item := range items.List() {
-			integration := runscope.EnvironmentIntegration{
-				ID: item.(string),
-			}
-
-			integrations = append(integrations, &integration)
-		}
-
-		environment.Integrations = integrations
-	}
-
-	if attr, ok := d.GetOk("regions"); ok {
-		regions := []string{}
-		items := attr.(*schema.Set)
-		for _, x := range items.List() {
-			item := x.(string)
-			regions = append(regions, item)
-		}
-
-		environment.Regions = regions
-	}
-
-	if attr, ok := d.GetOk("remote_agent"); ok {
-		remoteAgents := []*runscope.LocalMachine{}
-		items := attr.(*schema.Set)
-		for _, x := range items.List() {
-			item := x.(map[string]interface{})
-			remoteAgent := runscope.LocalMachine{
-				Name: item["name"].(string),
-				UUID: item["uuid"].(string),
-			}
-
-			remoteAgents = append(remoteAgents, &remoteAgent)
-		}
-		environment.RemoteAgents = remoteAgents
-	}
-
-	if attr, ok := d.GetOk("retry_on_failure"); ok {
-		environment.RetryOnFailure = attr.(bool)
-	}
-
-	environment.VerifySsl = d.Get("verify_ssl").(bool)
-
-	if attr, ok := d.GetOk("webhooks"); ok {
-		webhooks := []string{}
-		items := attr.(*schema.Set)
-		for _, x := range items.List() {
-			item := x.(string)
-			webhooks = append(webhooks, item)
-		}
-
-		environment.WebHooks = webhooks
-	}
-
-	environment.EmailSettings = expandEmailSettings(d.Get("email"), false)
-
-	return environment
+	return resourceEnvironmentRead(ctx, d, meta)
 }
 
-func expandEmailSettings(v interface{}, emptyIsNil bool) *runscope.EmailSettings {
-	es := &runscope.EmailSettings{}
-	if v == nil {
-		if emptyIsNil {
-			return nil
-		}
-		return es
+func resourceEnvironmentDelete(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
+	client := meta.(*providerConfig).client
+
+	opts := runscope.EnvironmentDeleteOpts{}
+	expandEnvironmentGetOpts(d, &opts.EnvironmentGetOpts)
+
+	if err := client.Environment.Delete(ctx, &opts); err != nil {
+		return diag.Errorf("Error deleting environment: %s", err)
 	}
 
-	list := v.([]interface{})
-	if len(list) < 1 {
-		if emptyIsNil {
-			return nil
-		}
-		return es
-	}
-
-	m := list[0].(map[string]interface{})
-	es.NotifyAll = m["notify_all"].(bool)
-	es.NotifyOn = m["notify_on"].(string)
-	es.NotifyThreshold = m["notify_threshold"].(int)
-	es.Recipients = expandRecipients(m["recipient"])
-
-	return es
+	return nil
 }
 
-func expandRecipients(v interface{}) []*runscope.Contact {
-	contacts := make([]*runscope.Contact, 0)
-	for _, val := range v.(*schema.Set).List() {
-		contacts = append(contacts, &runscope.Contact{
-			ID: val.(map[string]interface{})["id"].(string),
+func flattenEmails(e runscope.Emails) []interface{} {
+	return []interface{}{map[string]interface{}{
+		"notify_all":       e.NotifyAll,
+		"notify_on":        e.NotifyOn,
+		"notify_threshold": e.NotifyThreshold,
+		"recipient":        flattenRecipients(e.Recipients),
+	}}
+}
+
+func flattenRecipients(re []runscope.Recipient) []map[string]interface{} {
+	recipients := []map[string]interface{}{}
+	for _, rec := range re {
+		recipients = append(recipients, map[string]interface{}{
+			"id":    rec.Id,
+			"name":  rec.Name,
+			"email": rec.Email,
 		})
 	}
-	return contacts
-}
-
-func flattenIntegrations(integrations []*runscope.EnvironmentIntegration) []interface{} {
-	result := []interface{}{}
-
-	for _, integration := range integrations {
-		result = append(result, integration.ID)
-	}
-
-	return result
-}
-
-func flattenEmailSettings(emailSettings *runscope.EmailSettings) []interface{} {
-	if isDefaultEmailSettings(emailSettings) {
-		return nil
-	}
-
-	item := map[string]interface{}{
-		"notify_all":       emailSettings.NotifyAll,
-		"notify_on":        emailSettings.NotifyOn,
-		"notify_threshold": emailSettings.NotifyThreshold,
-	}
-
-	if len(emailSettings.Recipients) > 0 {
-		resultRecipients := []interface{}{}
-
-		for _, recipient := range emailSettings.Recipients {
-			item := map[string]interface{}{
-				"name":  recipient.Name,
-				"email": recipient.Email,
-				"id":    recipient.ID,
-			}
-			resultRecipients = append(resultRecipients, item)
-		}
-
-		item["recipient"] = resultRecipients
-	}
-
-	return []interface{}{item}
-}
-
-func isDefaultEmailSettings(e *runscope.EmailSettings) bool {
-	return e.NotifyAll == false && e.NotifyOn == "" && e.NotifyThreshold == 0 && len(e.Recipients) == 0
+	return recipients
 }
 
 func recipientsHash(v interface{}) int {
 	m := v.(map[string]interface{})
 	return schema.HashString(m["id"].(string))
+}
+
+func expandEnvironmentUriOpts(d *schema.ResourceData, opts *runscope.EnvironmentUriOpts) {
+	opts.BucketId = d.Get("bucket_id").(string)
+	if v, ok := d.GetOk("test_id"); ok {
+		opts.TestId = v.(string)
+	}
+}
+
+func expandEnvironmentGetOpts(d *schema.ResourceData, opts *runscope.EnvironmentGetOpts) {
+	opts.Id = d.Id()
+	expandEnvironmentUriOpts(d, &opts.EnvironmentUriOpts)
+}
+
+func expandEnvironmentBase(d *schema.ResourceData, opts *runscope.EnvironmentBase) {
+	opts.Name = d.Get("name").(string)
+	opts.VerifySSL = d.Get("verify_ssl").(bool)
+	if v, ok := d.GetOk("script"); ok {
+		opts.Script = v.(string)
+	}
+	if v, ok := d.GetOk("preserve_cookies"); ok {
+		opts.PreserveCookies = v.(bool)
+	}
+	if v, ok := d.GetOk("initial_variables"); ok {
+		opts.InitialVariables = map[string]string{}
+		for key, value := range v.(map[string]interface{}) {
+			opts.InitialVariables[key] = value.(string)
+		}
+	}
+	if v, ok := d.GetOk("integrations"); ok {
+		for _, id := range v.(*schema.Set).List() {
+			opts.Integrations = append(opts.Integrations, id.(string))
+		}
+	}
+	if v, ok := d.GetOk("regions"); ok {
+		for _, region := range v.(*schema.Set).List() {
+			opts.Regions = append(opts.Regions, region.(string))
+		}
+	}
+	if v, ok := d.GetOk("remote_agent"); ok {
+		for _, ra := range v.(*schema.Set).List() {
+			raa := ra.(map[string]interface{})
+			opts.RemoteAgents = append(opts.RemoteAgents, runscope.RemoteAgent{
+				Name: raa["name"].(string),
+				UUID: raa["uuid"].(string),
+			})
+		}
+	}
+	if v, ok := d.GetOk("retry_on_failure"); ok {
+		opts.RetryOnFailure = v.(bool)
+	}
+	if v, ok := d.GetOk("webhooks"); ok {
+		for _, w := range v.(*schema.Set).List() {
+			opts.Webhooks = append(opts.Webhooks, w.(string))
+		}
+	}
+	if v, ok := d.GetOk("email"); ok {
+		emails := v.([]interface{})
+		if len(emails) > 0 {
+			ee := emails[0].(map[string]interface{})
+			opts.Emails.NotifyOn = ee["notify_on"].(string)
+			opts.Emails.NotifyAll = ee["notify_all"].(bool)
+			opts.Emails.NotifyThreshold = ee["notify_threshold"].(int)
+			for _, re := range ee["recipient"].(*schema.Set).List() {
+				rec := re.(map[string]interface{})
+				opts.Emails.Recipients = append(opts.Emails.Recipients, runscope.Recipient{
+					Id:    rec["id"].(string),
+					Name:  rec["name"].(string),
+					Email: rec["email"].(string),
+				})
+			}
+		}
+	}
 }

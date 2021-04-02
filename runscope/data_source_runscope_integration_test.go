@@ -10,12 +10,11 @@ import (
 )
 
 func TestAccDataSourceRunscopeIntegration_Basic(t *testing.T) {
-
 	teamID := os.Getenv("RUNSCOPE_TEAM_ID")
 
 	resource.Test(t, resource.TestCase{
-		PreCheck:  func() { testAccPreCheck(t) },
-		Providers: testAccProviders,
+		PreCheck:          func() { testAccPreCheck(t) },
+		ProviderFactories: testAccProviderFactories,
 		Steps: []resource.TestStep{
 			{
 				Config: fmt.Sprintf(testAccDataSourceRunscopeIntegrationConfig, teamID),
@@ -64,8 +63,8 @@ func TestAccDataSourceRunscopeIntegration_Filter(t *testing.T) {
 	}
 
 	resource.Test(t, resource.TestCase{
-		PreCheck:  func() { testAccPreCheck(t) },
-		Providers: testAccProviders,
+		PreCheck:          func() { testAccPreCheck(t) },
+		ProviderFactories: testAccProviderFactories,
 		Steps: []resource.TestStep{
 			{
 				Config: fmt.Sprintf(testAccDataSourceRunscopeIntegrationFilterConfig, teamID, integrationDesc),
@@ -98,15 +97,17 @@ func testAccDataSourceRunscopeIntegrationFilter(dataSource string) resource.Test
 
 const testAccDataSourceRunscopeIntegrationFilterConfig = `
 data "runscope_integration" "by_type" {
-	team_uuid = "%s"
-	type      = "slack"
-	filter {
-		name = "type"
-		values = ["slack"]
-	}
-	filter {
-		name = "description"
-		values = ["%s","other test description"]
-	}
+  team_uuid = "%s"
+  type      = "slack"
+
+  filter {
+    name   = "type"
+    values = ["slack"]
+  }
+
+  filter {
+    name   = "description"
+    values = ["%s", "other test description"]
+  }
 }
 `

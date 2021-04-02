@@ -1,16 +1,17 @@
 package runscope
 
 import (
-	"log"
+	"context"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
+	"github.com/terraform-providers/terraform-provider-runscope/internal/runscope"
 	"time"
 
-	"github.com/ewilde/go-runscope"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
 
 func dataSourceRunscopeIntegrations() *schema.Resource {
 	return &schema.Resource{
-		Read: dataSourceRunscopeIntegrationsRead,
+		ReadContext: dataSourceRunscopeIntegrationsRead,
 
 		Schema: map[string]*schema.Schema{
 			"team_uuid": {
@@ -44,27 +45,25 @@ func dataSourceRunscopeIntegrations() *schema.Resource {
 	}
 }
 
-func dataSourceRunscopeIntegrationsRead(d *schema.ResourceData, meta interface{}) error {
-	client := meta.(*runscope.Client)
-
-	log.Printf("[INFO] Reading Runscope integration")
+func dataSourceRunscopeIntegrationsRead(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
+	client := meta.(*providerConfig).client
 
 	filters, filtersOk := d.GetOk("filter")
 
-	resp, err := client.ListIntegrations(d.Get("team_uuid").(string))
+	integrations, err := client.Integration.List(ctx, &runscope.IntegrationListOpts{TeamId: d.Get("team_uuid").(string)})
 	if err != nil {
-		return err
+		return diag.FromErr(err)
 	}
 
 	var ids []string
-	for _, integration := range resp {
+	for _, integration := range integrations {
 		if filtersOk {
 			if !integrationFiltersTest(integration, filters.(*schema.Set)) {
 				continue
 			}
 		}
 
-		ids = append(ids, integration.ID)
+		ids = append(ids, integration.UUID)
 	}
 
 	d.SetId(time.Now().UTC().String())

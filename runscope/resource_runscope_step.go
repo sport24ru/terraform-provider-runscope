@@ -1,23 +1,24 @@
 package runscope
 
 import (
+	"context"
 	"fmt"
-	"log"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
+	"github.com/terraform-providers/terraform-provider-runscope/internal/runscope"
 	"strconv"
 	"strings"
 
-	"github.com/ewilde/go-runscope"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
 
 func resourceRunscopeStep() *schema.Resource {
 	return &schema.Resource{
-		Create: resourceStepCreate,
-		Read:   resourceStepRead,
-		Update: resourceStepUpdate,
-		Delete: resourceStepDelete,
+		CreateContext: resourceStepCreate,
+		ReadContext:   resourceStepRead,
+		UpdateContext: resourceStepUpdate,
+		DeleteContext: resourceStepDelete,
 		Importer: &schema.ResourceImporter{
-			State: func(d *schema.ResourceData, meta interface{}) ([]*schema.ResourceData, error) {
+			StateContext: func(ctx context.Context, d *schema.ResourceData, meta interface{}) ([]*schema.ResourceData, error) {
 				parts := strings.Split(d.Id(), "/")
 
 				bucketId := parts[0]
@@ -48,18 +49,16 @@ func resourceRunscopeStep() *schema.Resource {
 				testId := parts[0]
 				d.Set("test_id", testId)
 
-				test := &runscope.Test{
-					ID: testId,
-					Bucket: &runscope.Bucket{
-						Key: bucketId,
-					},
+				opts := runscope.TestGetOpts{
+					BucketId: bucketId,
+					Id:       testId,
 				}
 
-				client := meta.(*runscope.Client)
+				client := meta.(*providerConfig).client
 
-				test, err = client.ReadTest(test)
+				test, err := client.Test.Get(ctx, opts)
 				if err != nil {
-					return nil, err
+					return nil, fmt.Errorf("Couldn't read test: %s", err)
 				}
 
 				nSteps := len(test.Steps)
@@ -67,7 +66,7 @@ func resourceRunscopeStep() *schema.Resource {
 					return nil, fmt.Errorf("test %s contains only %d steps", testId, nSteps)
 				}
 
-				d.SetId(test.Steps[stepPos-1].ID)
+				d.SetId(test.Steps[stepPos-1].Id)
 
 				return []*schema.ResourceData{d}, nil
 			},
@@ -200,239 +199,126 @@ func resourceRunscopeStep() *schema.Resource {
 	}
 }
 
-func resourceStepCreate(d *schema.ResourceData, meta interface{}) error {
-	client := meta.(*runscope.Client)
+func resourceStepCreate(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
+	client := meta.(*providerConfig).client
 
-	step, bucketID, testID, err := createStepFromResourceData(d)
+	opts := &runscope.StepCreateOpts{}
+	expandStepUriOpts(d, &opts.StepUriOpts)
+	expandStepBaseOpts(d, &opts.StepBaseOpts)
+
+	step, err := client.Step.Create(ctx, opts)
 	if err != nil {
-		return err
+		return diag.Errorf("Couldn't create step: %s", err)
 	}
 
-	log.Printf("[DEBUG] step create: %#v", step)
+	d.SetId(step.Id)
 
-	createdStep, err := client.CreateTestStep(step, bucketID, testID)
-	if err != nil {
-		return fmt.Errorf("Failed to create step: %s", err)
-	}
-
-	d.SetId(createdStep.ID)
-	log.Printf("[INFO] step ID: %s", d.Id())
-
-	return resourceStepRead(d, meta)
+	return resourceStepRead(ctx, d, meta)
 }
 
-func resourceStepRead(d *schema.ResourceData, meta interface{}) error {
-	client := meta.(*runscope.Client)
+func resourceStepRead(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
+	client := meta.(*providerConfig).client
 
-	stepFromResource, bucketID, testID, err := createStepFromResourceData(d)
-	if err != nil {
-		return fmt.Errorf("Failed to read step from resource data: %s", err)
-	}
+	opts := &runscope.StepGetOpts{}
+	opts.Id = d.Id()
+	opts.TestId = d.Get("test_id").(string)
+	opts.BucketId = d.Get("bucket_id").(string)
 
-	step, err := client.ReadTestStep(stepFromResource, bucketID, testID)
+	step, err := client.Step.Get(ctx, opts)
 	if err != nil {
-		if strings.Contains(err.Error(), "404") || strings.Contains(err.Error(), "403") {
+		if isNotFound(err) {
 			d.SetId("")
 			return nil
 		}
 
-		return fmt.Errorf("Couldn't find step: %s", err)
+		return diag.Errorf("Couldn't read step: %s", err)
 	}
 
-	d.Set("bucket_id", bucketID)
-	d.Set("test_id", testID)
 	d.Set("step_type", step.StepType)
 	d.Set("method", step.Method)
-	d.Set("url", step.URL)
+	d.Set("url", step.StepURL)
+	d.Set("variable", flattenStepVariables(step.Variables))
+	d.Set("assertion", flattenStepAssertions(step.Assertions))
+	d.Set("header", flattenStepHeaders(step.Headers))
+	if !step.Auth.Empty() {
+		d.Set("auth", flattenStepAuth(step.Auth))
+	}
 	d.Set("body", step.Body)
-	d.Set("variable", readVariables(step.Variables))
-	d.Set("assertion", readAssertions(step.Assertions))
-	d.Set("header", readHeaders(step.Headers))
 	d.Set("scripts", step.Scripts)
 	d.Set("before_scripts", step.BeforeScripts)
 	d.Set("note", step.Note)
-	if step.Auth != nil && len(step.Auth) > 0 {
-		d.Set("auth", []interface{}{
-			map[string]interface{}{
-				"username":  step.Auth["username"],
-				"auth_type": step.Auth["auth_type"],
-				"password":  step.Auth["password"],
-			},
-		})
+
+	return nil
+}
+
+func resourceStepUpdate(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
+	client := meta.(*providerConfig).client
+
+	opts := &runscope.StepUpdateOpts{}
+	expandStepGetOpts(d, &opts.StepGetOpts)
+	expandStepBaseOpts(d, &opts.StepBaseOpts)
+
+	_, err := client.Step.Update(ctx, opts)
+	if err != nil {
+		return diag.Errorf("Couldn't create step: %s", err)
+	}
+
+	return resourceStepRead(ctx, d, meta)
+}
+
+func resourceStepDelete(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
+	client := meta.(*providerConfig).client
+
+	opts := &runscope.StepDeleteOpts{}
+	expandStepGetOpts(d, &opts.StepGetOpts)
+
+	if err := client.Step.Delete(ctx, opts); err != nil {
+		return diag.Errorf("Couldn't read step: %s", err)
 	}
 
 	return nil
 }
 
-func resourceStepUpdate(d *schema.ResourceData, meta interface{}) error {
-	d.Partial(false)
-	stepFromResource, bucketID, testID, err := createStepFromResourceData(d)
-	if err != nil {
-		return fmt.Errorf("Error updating step: %s", err)
-	}
-
-	if d.HasChange("url") ||
-		d.HasChange("variable") ||
-		d.HasChange("assertion") ||
-		d.HasChange("header") ||
-		d.HasChange("body") ||
-		d.HasChange("note") {
-		client := meta.(*runscope.Client)
-		_, err = client.UpdateTestStep(stepFromResource, bucketID, testID)
-
-		if err != nil {
-			return fmt.Errorf("Error updating step: %s", err)
-		}
-	}
-
-	return nil
+func expandStepUriOpts(d *schema.ResourceData, opts *runscope.StepUriOpts) {
+	opts.BucketId = d.Get("bucket_id").(string)
+	opts.TestId = d.Get("test_id").(string)
 }
 
-func resourceStepDelete(d *schema.ResourceData, meta interface{}) error {
-	client := meta.(*runscope.Client)
-
-	stepFromResource, bucketID, testID, err := createStepFromResourceData(d)
-	if err != nil {
-		return fmt.Errorf("Failed to read step from resource data: %s", err)
-	}
-
-	err = client.DeleteTestStep(stepFromResource, bucketID, testID)
-	if err != nil {
-		return fmt.Errorf("Error deleting step: %s", err)
-	}
-
-	return nil
+func expandStepGetOpts(d *schema.ResourceData, opts *runscope.StepGetOpts) {
+	opts.Id = d.Id()
+	expandStepUriOpts(d, &opts.StepUriOpts)
 }
 
-func createStepFromResourceData(d *schema.ResourceData) (*runscope.TestStep, string, string, error) {
-
-	step := runscope.NewTestStep()
-	bucketID := d.Get("bucket_id").(string)
-	testID := d.Get("test_id").(string)
-	step.ID = d.Id()
-	step.StepType = d.Get("step_type").(string)
-	step.Body = d.Get("body").(string)
-	if attr, ok := d.GetOk("method"); ok {
-		step.Method = attr.(string)
+func expandStepBaseOpts(d *schema.ResourceData, opts *runscope.StepBaseOpts) {
+	opts.StepType = d.Get("step_type").(string)
+	if v, ok := d.GetOk("method"); ok {
+		opts.Method = v.(string)
 	}
-
-	if attr, ok := d.GetOk("url"); ok {
-		step.URL = attr.(string)
+	if v, ok := d.GetOk("url"); ok {
+		opts.StepURL = v.(string)
 	}
-
-	if attr, ok := d.GetOk("variable"); ok {
-		variables := []*runscope.Variable{}
-		items := attr.(*schema.Set)
-		for _, x := range items.List() {
-			item := x.(map[string]interface{})
-			variable := runscope.Variable{
-				Name:     item["name"].(string),
-				Property: item["property"].(string),
-				Source:   item["source"].(string),
-			}
-
-			variables = append(variables, &variable)
-		}
-		step.Variables = variables
+	if v, ok := d.GetOk("variable"); ok {
+		opts.Variables = expandStepVariables(v.(*schema.Set).List())
 	}
-
-	if v, _ := d.GetOk("auth"); v != nil {
-		authSet := v.(*schema.Set).List()
-		if len(authSet) == 1 {
-			authMap := authSet[0].(map[string]interface{})
-			auth := make(map[string]string)
-			for key, value := range authMap {
-				auth[key] = value.(string)
-			}
-			step.Auth = auth
-		}
+	if v, ok := d.GetOk("assertion"); ok {
+		opts.Assertions = expandStepAssertions(v.([]interface{}))
 	}
-
-	if attr, ok := d.GetOk("assertion"); ok {
-		assertions := []*runscope.Assertion{}
-		items := attr.([]interface{})
-		for _, x := range items {
-			item := x.(map[string]interface{})
-			variable := runscope.Assertion{
-				Source:     item["source"].(string),
-				Property:   item["property"].(string),
-				Comparison: item["comparison"].(string),
-				Value:      item["value"].(string),
-			}
-
-			assertions = append(assertions, &variable)
-		}
-		step.Assertions = assertions
+	if v, ok := d.GetOk("header"); ok {
+		opts.Headers = expandStepHeaders(v.(*schema.Set).List())
 	}
-
-	if attr, ok := d.GetOk("header"); ok {
-		step.Headers = make(map[string][]string)
-		items := attr.(*schema.Set)
-		for _, x := range items.List() {
-			item := x.(map[string]interface{})
-			header := item["header"].(string)
-			step.Headers[header] = append(step.Headers[header], item["value"].(string))
-		}
+	if v, ok := d.GetOk("auth"); ok {
+		opts.Auth = expandStepAuth(v.(*schema.Set).List())
 	}
-
-	if attr, ok := d.GetOk("scripts"); ok {
-		step.Scripts = expandStringList(attr.([]interface{}))
+	if v, ok := d.GetOk("body"); ok {
+		opts.Body = v.(string)
 	}
-
-	if attr, ok := d.GetOk("before_scripts"); ok {
-		step.BeforeScripts = expandStringList(attr.([]interface{}))
+	if v, ok := d.GetOk("scripts"); ok {
+		opts.Scripts = expandStringSlice(v.([]interface{}))
 	}
-
-	if attr, ok := d.GetOk("note"); ok {
-		step.Note = attr.(string)
+	if v, ok := d.GetOk("before_scripts"); ok {
+		opts.BeforeScripts = expandStringSlice(v.([]interface{}))
 	}
-
-	return step, bucketID, testID, nil
-}
-
-func readVariables(variables []*runscope.Variable) []map[string]interface{} {
-	result := make([]map[string]interface{}, 0, len(variables))
-	for _, integration := range variables {
-
-		item := map[string]interface{}{
-			"name":     integration.Name,
-			"source":   integration.Source,
-			"property": integration.Property,
-		}
-
-		result = append(result, item)
+	if v, ok := d.GetOk("note"); ok {
+		opts.Note = v.(string)
 	}
-
-	return result
-}
-
-func readAssertions(assertions []*runscope.Assertion) []map[string]interface{} {
-	result := make([]map[string]interface{}, 0, len(assertions))
-	for _, assertion := range assertions {
-
-		item := map[string]interface{}{
-			"source":     assertion.Source,
-			"property":   assertion.Property,
-			"comparison": assertion.Comparison,
-			"value":      assertion.Value,
-		}
-
-		result = append(result, item)
-	}
-
-	return result
-}
-
-func readHeaders(headers map[string][]string) []map[string]interface{} {
-	result := make([]map[string]interface{}, 0)
-	for header, values := range headers {
-		for _, value := range values {
-			result = append(result, map[string]interface{}{
-				"header": header,
-				"value":  value,
-			})
-		}
-	}
-
-	return result
 }

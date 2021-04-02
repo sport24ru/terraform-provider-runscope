@@ -1,24 +1,26 @@
 package runscope
 
 import (
+	"context"
 	"fmt"
+	"github.com/terraform-providers/terraform-provider-runscope/internal/runscope"
 	"os"
 	"testing"
 
-	"github.com/ewilde/go-runscope"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/terraform"
 )
 
 func TestAccStep_basic(t *testing.T) {
-	teamID := os.Getenv("RUNSCOPE_TEAM_ID")
+	teamId := os.Getenv("RUNSCOPE_TEAM_ID")
+	bucketName := testAccRandomBucketName()
 	resource.Test(t, resource.TestCase{
-		PreCheck:     func() { testAccPreCheck(t) },
-		Providers:    testAccProviders,
-		CheckDestroy: testAccCheckStepDestroy,
+		PreCheck:          func() { testAccPreCheck(t) },
+		ProviderFactories: testAccProviderFactories,
+		CheckDestroy:      testAccCheckStepDestroy,
 		Steps: []resource.TestStep{
 			{
-				Config: fmt.Sprintf(testRunscopeStepConfigA, teamID),
+				Config: fmt.Sprintf(testRunscopeStepConfigA, bucketName, teamId),
 				Check: resource.ComposeTestCheckFunc(
 					testAccCheckStepMainPageExists("runscope_step.main_page"),
 					resource.TestCheckResourceAttr(
@@ -34,39 +36,65 @@ func TestAccStep_basic(t *testing.T) {
 
 func TestAccStep_multiple_steps(t *testing.T) {
 	teamID := os.Getenv("RUNSCOPE_TEAM_ID")
-	fmt.Printf("TF_ACC: %s\n", os.Getenv("TF_ACC"))
+	bucketName := testAccRandomBucketName()
+
 	resource.Test(t, resource.TestCase{
-		PreCheck:     func() { testAccPreCheck(t) },
-		Providers:    testAccProviders,
-		CheckDestroy: testAccCheckStepDestroy,
+		PreCheck:          func() { testAccPreCheck(t) },
+		ProviderFactories: testAccProviderFactories,
+		CheckDestroy:      testAccCheckStepDestroy,
 		Steps: []resource.TestStep{
 			{
-				Config: fmt.Sprintf(testRunscopeStepConfigMultipleSteps, teamID),
+				Config: fmt.Sprintf(testRunscopeStepConfigMultipleSteps, bucketName, teamID),
 				Check: resource.ComposeTestCheckFunc(
 					testAccCheckStepExists("runscope_step.step_a"),
-					testAccCheckStepOrder("runscope_test.test_a"),
+					testAccCheckStepOrder("runscope_test.test_a", "runscope_step.step_a", "runscope_step.step_b"),
 					resource.TestCheckResourceAttr(
 						"runscope_step.step_a", "url", "http://step_a.com"),
 					resource.TestCheckResourceAttr(
 						"runscope_step.step_b", "url", "http://step_b.com")),
+			},
+			{
+				ResourceName:      "runscope_step.step_a",
+				ImportState:       true,
+				ImportStateVerify: true,
+				ImportStateIdFunc: func(s *terraform.State) (string, error) {
+					rs, ok := s.RootModule().Resources["runscope_step.step_a"]
+					if !ok {
+						return "", fmt.Errorf("not found runscope_step.step_a")
+					}
+					return fmt.Sprintf("%s/%s/%s", rs.Primary.Attributes["bucket_id"], rs.Primary.Attributes["test_id"], rs.Primary.ID), nil
+				},
+			},
+			{
+				ResourceName:      "runscope_step.step_b",
+				ImportState:       true,
+				ImportStateVerify: true,
+				ImportStateIdFunc: func(s *terraform.State) (string, error) {
+					rs, ok := s.RootModule().Resources["runscope_step.step_b"]
+					if !ok {
+						return "", fmt.Errorf("not found runscope_step.step_b")
+					}
+					return fmt.Sprintf("%s/%s#%d", rs.Primary.Attributes["bucket_id"], rs.Primary.Attributes["test_id"], 2), nil
+				},
 			},
 		},
 	})
 }
 
 func testAccCheckStepDestroy(s *terraform.State) error {
-	client := testAccProvider.Meta().(*runscope.Client)
+	client := testAccProvider.Meta().(*providerConfig).client
+	ctx := context.Background()
 
 	for _, rs := range s.RootModule().Resources {
 		if rs.Type != "runscope_step" {
 			continue
 		}
 
-		var err error
-		bucketID := rs.Primary.Attributes["bucket_id"]
-		testID := rs.Primary.Attributes["test_id"]
-		err = client.DeleteTestStep(&runscope.TestStep{ID: rs.Primary.ID}, bucketID, testID)
+		opts := &runscope.StepDeleteOpts{}
+		opts.BucketId = rs.Primary.Attributes["bucket_id"]
+		opts.TestId = rs.Primary.Attributes["test_id"]
 
+		err := client.Step.Delete(ctx, opts)
 		if err == nil {
 			return fmt.Errorf("Record %s still exists", rs.Primary.ID)
 		}
@@ -77,6 +105,8 @@ func testAccCheckStepDestroy(s *terraform.State) error {
 
 func testAccCheckStepMainPageExists(n string) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
+		ctx := context.Background()
+
 		rs, ok := s.RootModule().Resources[n]
 
 		if !ok {
@@ -87,50 +117,46 @@ func testAccCheckStepMainPageExists(n string) resource.TestCheckFunc {
 			return fmt.Errorf("No Record ID is set")
 		}
 
-		client := testAccProvider.Meta().(*runscope.Client)
+		client := testAccProvider.Meta().(*providerConfig).client
 
-		var foundRecord *runscope.TestStep
-		var err error
+		opts := &runscope.StepGetOpts{}
+		opts.Id = rs.Primary.ID
+		opts.TestId = rs.Primary.Attributes["test_id"]
+		opts.BucketId = rs.Primary.Attributes["bucket_id"]
 
-		step := new(runscope.TestStep)
-		step.ID = rs.Primary.ID
-		bucketID := rs.Primary.Attributes["bucket_id"]
-		testID := rs.Primary.Attributes["test_id"]
-
-		foundRecord, err = client.ReadTestStep(step, bucketID, testID)
-
+		step, err := client.Step.Get(ctx, opts)
 		if err != nil {
 			return err
 		}
 
-		if foundRecord.ID != rs.Primary.ID {
+		if step.Id != rs.Primary.ID {
 			return fmt.Errorf("Record not found")
 		}
 
-		if len(foundRecord.Variables) != 2 {
-			return fmt.Errorf("Expected %d variables, actual %d", 2, len(foundRecord.Variables))
+		if len(step.Variables) != 2 {
+			return fmt.Errorf("Expected %d variables, actual %d", 2, len(step.Variables))
 		}
 
-		variable := foundRecord.Variables[1]
+		variable := step.Variables[1]
 		if variable.Name != "httpContentEncoding" {
 			return fmt.Errorf("Expected %s variables, actual %s", "httpContentEncoding", variable.Name)
 		}
 
-		if len(foundRecord.Assertions) != 2 {
-			return fmt.Errorf("Expected %d assertions, actual %d", 2, len(foundRecord.Assertions))
+		if len(step.Assertions) != 2 {
+			return fmt.Errorf("Expected %d assertions, actual %d", 2, len(step.Assertions))
 		}
 
-		assertion := foundRecord.Assertions[1]
+		assertion := step.Assertions[1]
 		if assertion.Source != "response_json" {
 			return fmt.Errorf("Expected assertion source %s, actual %s",
 				"response_json", assertion.Source)
 		}
 
-		if len(foundRecord.Headers) != 2 {
-			return fmt.Errorf("Expected %d headers, actual %d", 1, len(foundRecord.Headers))
+		if len(step.Headers) != 2 {
+			return fmt.Errorf("Expected %d headers, actual %d", 1, len(step.Headers))
 		}
 
-		if header, ok := foundRecord.Headers["Accept-Encoding"]; ok {
+		if header, ok := step.Headers["Accept-Encoding"]; ok {
 			if len(header) != 2 {
 				return fmt.Errorf("Expected %d values for header %s, actual %d",
 					2, "Accept-Encoding", len(header))
@@ -145,24 +171,24 @@ func testAccCheckStepMainPageExists(n string) resource.TestCheckFunc {
 			return fmt.Errorf("Expected header %s to exist", "Accept-Encoding")
 		}
 
-		if len(foundRecord.Scripts) != 2 {
-			return fmt.Errorf("Expected %d scripts, actual %d", 2, len(foundRecord.Scripts))
+		if len(step.Scripts) != 2 {
+			return fmt.Errorf("Expected %d scripts, actual %d", 2, len(step.Scripts))
 		}
 
-		if foundRecord.Scripts[1] != "log(\"script 2\");" {
-			return fmt.Errorf("Expected %s, actual %s", "log(\"script 2\");", foundRecord.Scripts[1])
+		if step.Scripts[1] != "log(\"script 2\");" {
+			return fmt.Errorf("Expected %s, actual %s", "log(\"script 2\");", step.Scripts[1])
 		}
 
-		if len(foundRecord.BeforeScripts) != 1 {
-			return fmt.Errorf("Expected %d scripts, actual %d", 1, len(foundRecord.BeforeScripts))
+		if len(step.BeforeScripts) != 1 {
+			return fmt.Errorf("Expected %d scripts, actual %d", 1, len(step.BeforeScripts))
 		}
 
-		if foundRecord.BeforeScripts[0] != "log(\"before script\");" {
-			return fmt.Errorf("Expected %s, actual %s", "log(\"before script\");", foundRecord.BeforeScripts[0])
+		if step.BeforeScripts[0] != "log(\"before script\");" {
+			return fmt.Errorf("Expected %s, actual %s", "log(\"before script\");", step.BeforeScripts[0])
 		}
 
-		if foundRecord.Note != "Testing step, single step test" {
-			return fmt.Errorf("Expected note %s, actual note %s", "Testing step, single step test", foundRecord.Note)
+		if step.Note != "Testing step, single step test" {
+			return fmt.Errorf("Expected note %s, actual note %s", "Testing step, single step test", step.Note)
 		}
 
 		return nil
@@ -171,6 +197,8 @@ func testAccCheckStepMainPageExists(n string) resource.TestCheckFunc {
 
 func testAccCheckStepExists(n string) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
+		ctx := context.Background()
+
 		rs, ok := s.RootModule().Resources[n]
 
 		if !ok {
@@ -181,23 +209,19 @@ func testAccCheckStepExists(n string) resource.TestCheckFunc {
 			return fmt.Errorf("No Record ID is set")
 		}
 
-		client := testAccProvider.Meta().(*runscope.Client)
+		client := testAccProvider.Meta().(*providerConfig).client
 
-		var foundRecord *runscope.TestStep
-		var err error
+		opts := &runscope.StepGetOpts{}
+		opts.Id = rs.Primary.ID
+		opts.TestId = rs.Primary.Attributes["test_id"]
+		opts.BucketId = rs.Primary.Attributes["bucket_id"]
 
-		step := new(runscope.TestStep)
-		step.ID = rs.Primary.ID
-		bucketID := rs.Primary.Attributes["bucket_id"]
-		testID := rs.Primary.Attributes["test_id"]
-
-		foundRecord, err = client.ReadTestStep(step, bucketID, testID)
-
+		step, err := client.Step.Get(ctx, opts)
 		if err != nil {
 			return err
 		}
 
-		if foundRecord.ID != rs.Primary.ID {
+		if step.Id != rs.Primary.ID {
 			return fmt.Errorf("Record not found")
 		}
 
@@ -205,8 +229,10 @@ func testAccCheckStepExists(n string) resource.TestCheckFunc {
 	}
 }
 
-func testAccCheckStepOrder(n string) resource.TestCheckFunc {
+func testAccCheckStepOrder(n, s1, s2 string) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
+		ctx := context.Background()
+
 		rs, ok := s.RootModule().Resources[n]
 
 		if !ok {
@@ -217,37 +243,59 @@ func testAccCheckStepOrder(n string) resource.TestCheckFunc {
 			return fmt.Errorf("No Record ID is set")
 		}
 
-		client := testAccProvider.Meta().(*runscope.Client)
+		client := testAccProvider.Meta().(*providerConfig).client
 
-		var test *runscope.Test
-		var err error
+		opts := runscope.TestGetOpts{
+			BucketId: rs.Primary.Attributes["bucket_id"],
+			Id:       rs.Primary.ID,
+		}
 
-		bucketID := rs.Primary.Attributes["bucket_id"]
-		test, err = client.ReadTest(&runscope.Test{ID: rs.Primary.ID, Bucket: &runscope.Bucket{Key: bucketID}})
-
+		test, err := client.Test.Get(ctx, opts)
 		if err != nil {
 			return err
 		}
 
-		if test.ID != rs.Primary.ID {
+		if test.Id != rs.Primary.ID {
 			return fmt.Errorf("Record not found")
 		}
 
-		if test.Steps[0].URL != "http://step_a.com" {
-			return fmt.Errorf("Steps not in correct order, want http://step_a.com got %s", test.Steps[0].URL)
+		step1, ok := s.RootModule().Resources[s1]
+		if !ok {
+			return fmt.Errorf("Step not found: %s", s1)
 		}
 
-		if test.Steps[1].URL != "http://step_b.com" {
-			return fmt.Errorf("Steps not in correct order, want http://step_a.com got %s", test.Steps[1].URL)
+		step2, ok := s.RootModule().Resources[s2]
+		if !ok {
+			return fmt.Errorf("Step not found: %s", s2)
 		}
+
+		if step1.Primary.ID != test.Steps[0].Id {
+			return fmt.Errorf("Steps not in correct order, want %s got %s", step1.Primary.ID, test.Steps[0].Id)
+		}
+
+		if step2.Primary.ID != test.Steps[1].Id {
+			return fmt.Errorf("Steps not in correct order, want %s got %s", step2.Primary.ID, test.Steps[1].Id)
+		}
+
 		return nil
 	}
 }
 
 const testRunscopeStepConfigA = `
+resource "runscope_bucket" "bucket" {
+  name      = "%s"
+  team_uuid = "%s"
+}
+
+resource "runscope_test" "test" {
+  bucket_id   = "${runscope_bucket.bucket.id}"
+  name        = "runscope test"
+  description = "This is a test test..."
+}
+
 resource "runscope_step" "main_page" {
-  bucket_id      = "${runscope_bucket.bucket.id}"
-  test_id        = "${runscope_test.test.id}"
+  bucket_id      = runscope_bucket.bucket.id
+  test_id        = runscope_test.test.id
   step_type      = "request"
   note           = "Testing step, single step test"
   url            = "http://example.com"
@@ -302,28 +350,20 @@ resource "runscope_step" "main_page" {
     "log(\"before script\");",
   ]
 }
-
-resource "runscope_test" "test" {
-  bucket_id   = "${runscope_bucket.bucket.id}"
-  name        = "runscope test"
-  description = "This is a test test..."
-}
-
-resource "runscope_bucket" "bucket" {
-  name      = "terraform-provider-test"
-  team_uuid = "%s"
-}
 `
 
 const testRunscopeStepConfigMultipleSteps = `
-resource "runscope_step" "step_a" {
-  bucket_id      = "${runscope_bucket.bucket.id}"
-  test_id        = "${runscope_test.test_a.id}"
-  step_type      = "request"
-  note           = "Multiple step test, test a"
-  url            = "http://step_a.com"
-  method         = "GET"
+resource "runscope_bucket" "bucket" {
+  name      = "%s"
+  team_uuid = "%s"
 }
+
+resource "runscope_test" "test_a" {
+  bucket_id   = runscope_bucket.bucket.id
+  name        = "runscope test a"
+  description = "This is a test a"
+}
+
 resource "runscope_step" "step_b" {
   bucket_id      = runscope_bucket.bucket.id
   test_id        = runscope_test.test_a.id
@@ -334,14 +374,12 @@ resource "runscope_step" "step_b" {
   depends_on     = ["runscope_step.step_a"]
 }
 
-resource "runscope_test" "test_a" {
-  bucket_id   = runscope_bucket.bucket.id
-  name        = "runscope test a"
-  description = "This is a test a"
-}
-
-resource "runscope_bucket" "bucket" {
-  name      = "terraform-provider-test"
-  team_uuid = "%s"
+resource "runscope_step" "step_a" {
+  bucket_id      = runscope_bucket.bucket.id
+  test_id        = runscope_test.test_a.id
+  step_type      = "request"
+  note           = "Multiple step test, test a"
+  url            = "http://step_a.com"
+  method         = "GET"
 }
 `

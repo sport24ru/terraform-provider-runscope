@@ -6,50 +6,37 @@ import (
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/terraform"
 )
 
 func TestAccDataSourceRunscopeBuckets(t *testing.T) {
-
-	teamID := os.Getenv("RUNSCOPE_TEAM_ID")
+	teamId := os.Getenv("RUNSCOPE_TEAM_ID")
+	bucketName := testAccRandomBucketName()
 
 	resource.Test(t, resource.TestCase{
-		PreCheck:     func() { testAccPreCheck(t) },
-		Providers:    testAccProviders,
-		CheckDestroy: testAccCheckBucketDestroy,
+		PreCheck:          func() { testAccPreCheck(t) },
+		ProviderFactories: testAccProviderFactories,
+		CheckDestroy:      testAccCheckBucketDestroy,
 		Steps: []resource.TestStep{
 			{
-				Config: fmt.Sprintf(testAccDataSourceRunscopeBucketsConfig, teamID),
+				Config: fmt.Sprintf(testAccDataSourceRunscopeBucketsConfig, teamId, bucketName),
 				Check: resource.ComposeTestCheckFunc(
-					testAccDataSourceRunscopeBuckets("data.runscope_buckets.test"),
+					resource.TestCheckResourceAttr("data.runscope_buckets.test", "keys.#", "1"),
 				),
 			},
 		},
 	})
 }
 
-func testAccDataSourceRunscopeBuckets(dataSource string) resource.TestCheckFunc {
-	return func(s *terraform.State) error {
-		r := s.RootModule().Resources[dataSource]
-		a := r.Primary.Attributes
-
-		if a["keys.#"] != "1" {
-			return fmt.Errorf("expected to get 1 bucket key returned from runscope data resource %v, got %v", dataSource, a["keys.#"])
-		}
-
-		return nil
-	}
-}
-
 const testAccDataSourceRunscopeBucketsConfig = `
 resource "runscope_bucket" "test" {
-	team_uuid = "%s"
-	name = "integration-test-bucket"
+  team_uuid = "%s"
+  name      = "%s"
 }
+
 data "runscope_buckets" "test" {
-	filter {
-			name = "name"
-			values = ["${runscope_bucket.test.name}"]
-		}
+  filter {
+    name   = "name"
+    values = [runscope_bucket.test.name]
+  }
 }
 `

@@ -1,19 +1,19 @@
 package runscope
 
 import (
-	"fmt"
-	"log"
+	"context"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
+	"github.com/terraform-providers/terraform-provider-runscope/internal/runscope"
 	"strings"
 
-	"github.com/ewilde/go-runscope"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
 
 func resourceRunscopeSchedule() *schema.Resource {
 	return &schema.Resource{
-		Create: resourceScheduleCreate,
-		Read:   resourceScheduleRead,
-		Delete: resourceScheduleDelete,
+		CreateContext: resourceScheduleCreate,
+		ReadContext:   resourceScheduleRead,
+		DeleteContext: resourceScheduleDelete,
 
 		Schema: map[string]*schema.Schema{
 			"bucket_id": {
@@ -46,85 +46,75 @@ func resourceRunscopeSchedule() *schema.Resource {
 	}
 }
 
-func resourceScheduleCreate(d *schema.ResourceData, meta interface{}) error {
-	client := meta.(*runscope.Client)
+func resourceScheduleCreate(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
+	client := meta.(*providerConfig).client
 
-	schedule, bucketID, testID, err := createScheduleFromResourceData(d)
-	if err != nil {
-		return err
+	opts := &runscope.ScheduleCreateOpts{}
+	opts.EnvironmentId = d.Get("environment_id").(string)
+	expandScheduleBaseOpts(d, &opts.ScheduleBaseOpts)
+	if v, ok := d.GetOk("interval"); ok {
+		opts.Interval = v.(string)
+	}
+	if v, ok := d.GetOk("note"); ok {
+		opts.Note = v.(string)
 	}
 
-	log.Printf("[DEBUG] schedule create: %#v", schedule)
-
-	createdSchedule, err := client.CreateSchedule(schedule, bucketID, testID)
+	schedule, err := client.Schedule.Create(ctx, opts)
 	if err != nil {
-		return fmt.Errorf("Failed to create schedule: %s", err)
-	}
-
-	d.SetId(createdSchedule.ID)
-	log.Printf("[INFO] schedule ID: %s", d.Id())
-
-	return resourceScheduleRead(d, meta)
-}
-
-func resourceScheduleRead(d *schema.ResourceData, meta interface{}) error {
-	client := meta.(*runscope.Client)
-
-	scheduleFromResource, bucketID, testID, err := createScheduleFromResourceData(d)
-	if err != nil {
-		return fmt.Errorf("Failed to read schedule from resource data: %s", err)
-	}
-
-	schedule, err := client.ReadSchedule(scheduleFromResource, bucketID, testID)
-	if err != nil {
-		if strings.Contains(err.Error(), "404") || strings.Contains(err.Error(), "403") {
+		if isNotFound(err) {
 			d.SetId("")
 			return nil
 		}
 
-		return fmt.Errorf("Couldn't find schedule: %s", err)
+		return diag.Errorf("Couldn't create schedule: %s", err)
 	}
 
-	d.Set("bucket_id", bucketID)
-	d.Set("test_id", testID)
-	d.Set("environment_id", schedule.EnvironmentID)
+	d.SetId(schedule.Id)
+
+	return resourceScheduleRead(ctx, d, meta)
+}
+
+func resourceScheduleRead(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
+	client := meta.(*providerConfig).client
+
+	opts := &runscope.ScheduleGetOpts{}
+	expandScheduleGetOpts(d, opts)
+
+	schedule, err := client.Schedule.Get(ctx, opts)
+	if err != nil {
+		if isNotFound(err) {
+			d.SetId("")
+			return nil
+		}
+
+		return diag.Errorf("Couldn't read schedule: %s", err)
+	}
+
+	d.Set("environment_id", schedule.EnvironmentId)
 	d.Set("interval", strings.ReplaceAll(schedule.Interval, ".0", ""))
 	d.Set("note", schedule.Note)
 	return nil
 }
 
-func resourceScheduleDelete(d *schema.ResourceData, meta interface{}) error {
-	client := meta.(*runscope.Client)
+func resourceScheduleDelete(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
+	client := meta.(*providerConfig).client
 
-	scheduleFromResource, bucketID, testID, err := createScheduleFromResourceData(d)
-	if err != nil {
-		return fmt.Errorf("Failed to read schedule from resource data: %s", err)
-	}
+	opts := &runscope.ScheduleDeleteOpts{}
+	expandScheduleGetOpts(d, &opts.ScheduleGetOpts)
 
-	err = client.DeleteSchedule(scheduleFromResource, bucketID, testID)
-	if err != nil {
-		return fmt.Errorf("Error deleting schedule: %s", err)
+	if err := client.Schedule.Delete(ctx, opts); err != nil {
+		return diag.Errorf("Error deleting test: %s", err)
 	}
 
 	return nil
 }
 
-func createScheduleFromResourceData(d *schema.ResourceData) (*runscope.Schedule, string, string, error) {
+func expandScheduleBaseOpts(d *schema.ResourceData, opts *runscope.ScheduleBaseOpts) {
+	opts.BucketId = d.Get("bucket_id").(string)
+	opts.TestId = d.Get("test_id").(string)
+}
 
-	schedule := runscope.NewSchedule()
-	bucketID := d.Get("bucket_id").(string)
-	testID := d.Get("test_id").(string)
-	environmentID := d.Get("environment_id").(string)
-	interval := d.Get("interval").(string)
-	note := ""
-
-	if v, ok := d.GetOk("note"); ok {
-		note = v.(string)
-	}
-
-	schedule.ID = d.Id()
-	schedule.Interval = interval
-	schedule.Note = note
-	schedule.EnvironmentID = environmentID
-	return schedule, bucketID, testID, nil
+func expandScheduleGetOpts(d *schema.ResourceData, opts *runscope.ScheduleGetOpts) {
+	opts.Id = d.Id()
+	expandScheduleBaseOpts(d, &opts.ScheduleBaseOpts)
 }
