@@ -1,12 +1,4 @@
----
-layout: "runscope"
-page_title: "Runscope: runscope_buckets"
-sidebar_current: "docs-runscope-datasource-buckets"
-description: |-
-  Get information about runscope buckets.
----
-
-# runscope\_buckets
+# Data Source `runscope_buckets`
 
 Use this data source to get information about matching [buckets](https://www.runscope.com/docs/api/buckets)
 that you can use with other runscope resources.

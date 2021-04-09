@@ -1,11 +1,3 @@
----
-layout: "runscope"
-page_title: "Provider: Runscope"
-sidebar_current: "docs-runscope-index"
-description: |-
-  The Runscope provider is used to interact with the resources supported by Runscope. The provider needs to be configured with the proper access token before it can be used.
----
-
 # Runscope Provider
 
 The Runscope provider is used to interact with the

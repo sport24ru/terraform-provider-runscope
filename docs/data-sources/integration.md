@@ -1,12 +1,4 @@
----
-layout: "runscope"
-page_title: "Runscope: runscope_integration"
-sidebar_current: "docs-runscope-datasource-integration"
-description: |-
-  Get information about runscope integrations enabled on for your team.
----
-
-# runscope\_integration
+# Data Source `runscope_integration`
 
 Use this data source to get information about a specific [integration](https://www.runscope.com/docs/api/integrations)
 that you can with other runscope resources.
@@ -20,12 +12,12 @@ data "runscope_integration" "pagerduty" {
 }
 
 resource "runscope_environment" "environment" {
-  bucket_id = "${runscope_bucket.bucket.id}"
+  bucket_id = runscope_bucket.bucket.id
   name      = "test-environment"
 
   integrations = [
     {
-      id               = "${data.runscope_integration.pagerduty.id}"
+      id               = data.runscope_integration.pagerduty.id
       integration_type = "pagerduty"
     }
   ]

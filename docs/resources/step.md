@@ -1,90 +1,83 @@
----
-layout: "runscope"
-page_title: "Runscope: runscope_step"
-sidebar_current: "docs-runscope-resource-step"
-description: |-
-  Provides a Runscope step resource.
----
-
-# runscope\_step
+# Resource `runscope_step`
 
 A [step](https://www.runscope.com/docs/api/steps) resource.
 API tests are comprised of a series of steps, most often HTTP requests.
 In addition to requests, you can also add additional types of steps to
 your tests like pauses and conditions.
 
-### Creating a step
+## Example Usage
+
 ```hcl
-resource "runscope_step" "main_page" {
-  bucket_id = "${runscope_bucket.bucket.id}"
-  test_id   = "${runscope_test.test.id}"
-  step_type = "request"
-  url       = "http://example.com"
-  note      = "A comment for the test step"
-  method    = "GET"
-  variable {
-    name   = "httpStatus"
-    source = "response_status"
-  }
-  variable {
-    name     = "httpContentEncoding"
-    source   = "response_header"
-    property = "Content-Encoding"
-  }
-
-  assertion {
-    source     = "response_status"
-    comparison = "equal_number"
-    value      = "200"
-  }
-  assertion {
-    source     = "response_json"
-    comparison = "equal"
-    value      = "c5baeb4a-2379-478a-9cda-1b671de77cf9"
-    property   = "data.id"
-  }
-
-  auth {
-    username  = "myUsername"
-    auth_type = "basic"
-    password  = "myPassword"
-  }
-  before_scripts = [<<EOF
-       var endVar = new Date();
-       var startVar = new Date();
-       alert('this is a multi-line before script')
-    EOF
-  ]
-  scripts = [<<EOF
-       var endVar = new Date();
-       var startVar = new Date();
-       alert('this is a multi-line after script')
-    EOF
-  ]
-  header {
-    header = "Accept-Encoding"
-    value  = "application/json"
-  }
-  header {
-    header = "Accept-Encoding"
-    value  = "application/xml"
-  }
-  header {
-    header = "Authorization"
-    value  = "Bearer bb74fe7b-b9f2-48bd-9445-bdc60e1edc6a"
-  }
-
+resource "runscope_bucket" "bucket" {
+    name      = "terraform-provider-test"
+    team_uuid = "dfb75aac-eeb3-4451-8675-3a37ab421e4f"
 }
 
 resource "runscope_test" "test" {
-  bucket_id   = "${runscope_bucket.bucket.id}"
+  bucket_id   = runscope_bucket.bucket.id
   name        = "runscope test"
   description = "This is a test test..."
 }
 
-resource "runscope_bucket" "bucket" {
-  name      = "terraform-provider-test"
-  team_uuid = "dfb75aac-eeb3-4451-8675-3a37ab421e4f"
+resource "runscope_step" "main_page" {
+    bucket_id = runscope_bucket.bucket.id
+    test_id   = runscope_test.test.id
+    step_type = "request"
+    url       = "http://example.com"
+    note      = "A comment for the test step"
+    method    = "GET"
+    variable {
+        name   = "httpStatus"
+        source = "response_status"
+    }
+    variable {
+        name     = "httpContentEncoding"
+        source   = "response_header"
+        property = "Content-Encoding"
+    }
+
+    assertion {
+        source     = "response_status"
+        comparison = "equal_number"
+        value      = "200"
+    }
+    assertion {
+        source     = "response_json"
+        comparison = "equal"
+        value      = "c5baeb4a-2379-478a-9cda-1b671de77cf9"
+        property   = "data.id"
+    }
+
+    auth {
+        username  = "myUsername"
+        auth_type = "basic"
+        password  = "myPassword"
+    }
+    before_scripts = [<<EOF
+       var endVar = new Date();
+       var startVar = new Date();
+       alert('this is a multi-line before script')
+    EOF
+    ]
+    scripts = [<<EOF
+       var endVar = new Date();
+       var startVar = new Date();
+       alert('this is a multi-line after script')
+    EOF
+    ]
+    header {
+        header = "Accept-Encoding"
+        value  = "application/json"
+    }
+    header {
+        header = "Accept-Encoding"
+        value  = "application/xml"
+    }
+    header {
+        header = "Authorization"
+        value  = "Bearer bb74fe7b-b9f2-48bd-9445-bdc60e1edc6a"
+    }
+
 }
 ```
 
@@ -96,13 +89,14 @@ The following arguments are supported:
 * `test_id` - (Required) The id of the test to associate this step with.
 * `note` = (Optional) A comment attached to the test step.
 * `step_type` - (Required) The type of step.
- * [request](#request-steps)
- * pause
- * condition
- * ghost
- * subtest
+  * [request](#request-steps)
+  * pause
+  * condition
+  * ghost
+  * subtest
 
 ### Request steps
+
 When creating a `request` type of step the additional arguments also apply:
 
 * `method` - (Required) The HTTP method for this request step.
@@ -143,7 +137,6 @@ Status Code == 200
 
 JSON element 'address' contains the text "avenue"
 
-
 ```
 "assertion": [
     {
@@ -156,7 +149,6 @@ JSON element 'address' contains the text "avenue"
 ```
 
 Response Time is faster than 1 second.
-
 
 ```
 "assertion": [

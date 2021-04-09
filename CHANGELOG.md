@@ -1,3 +1,10 @@
+## 0.10.0 (Unreleased)
+
+NOTES:
+
+* Resources are reimplemented using internal context-aware client library.
+  go-runscope removed from dependencies.
+
 ## 0.9.0 (April 1, 2021)
 
 BREAKING CHANGES:

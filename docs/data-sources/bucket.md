@@ -1,12 +1,4 @@
----
-layout: "runscope"
-page_title: "Runscope: runscope_bucket"
-sidebar_current: "docs-runscope-datasource-bucket"
-description: |-
-  Get information about a single runscope bucket.
----
-
-# runscope\_bucket
+# Data Source `runscope_bucket`
 
 Use this data source to get information about a specific [bucket](https://www.runscope.com/docs/api/buckets)
 that you can use with other runscope resources.
@@ -19,7 +11,7 @@ data "runscope_bucket" "website" {
 }
 
 resource "runscope_environment" "environment" {
-  bucket_id = "${runscope_bucket.website.id}"
+  bucket_id = runscope_bucket.website.id
   name      = "test-environment"
 }
 ```

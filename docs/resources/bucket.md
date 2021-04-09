@@ -1,24 +1,15 @@
----
-layout: "runscope"
-page_title: "Runscope: runscope_bucket"
-sidebar_current: "docs-runscope-resource-bucket"
-description: |-
-  Provides a Runscope bucket resource.
----
-
-# runscope\_bucket
+# Resource `runscope_bucket`
 
 A [bucket](https://www.runscope.com/docs/api/buckets) resource.
-[Buckets](https://www.runscope.com/docs/buckets) are a simple way to
-organize your requests and tests.
+[Buckets](https://www.runscope.com/docs/buckets) are a simple way to organize your requests and tests.
 
 ## Example Usage
 
 ```hcl
 # Add a bucket to your runscope account
 resource "runscope_bucket" "main" {
-  name      = "a-bucket"
-  team_uuid = "870ed937-bc6e-4d8b-a9a5-d7f9f2412fa3"
+    name      = "a-bucket"
+    team_uuid = "870ed937-bc6e-4d8b-a9a5-d7f9f2412fa3"
 }
 ```
 
@@ -27,8 +18,7 @@ resource "runscope_bucket" "main" {
 The following arguments are supported:
 
 * `name` - (String, Required) The name of this bucket.
-* `team_uuid` - (String, Required) Unique identifier for the team this bucket
-  is being created for.
+* `team_uuid` - (String, Required) Unique identifier for the team this bucket is being created for.
 
 ## Attributes Reference
 
@@ -45,4 +35,3 @@ Buckets can be imported using the bucket `key`, e.g.
 ```
 $ terraform import runscope_bucket.example t2f4bkvnggcx
 ```
-

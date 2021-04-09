@@ -1,12 +1,4 @@
----
-layout: "runscope"
-page_title: "Runscope: runscope_integrations"
-sidebar_current: "docs-runscope-datasource-integrations"
-description: |-
-  Get information about runscope integrations enabled on for your team.
----
-
-# runscope\_integration
+# Data Source `runscope_integration`
 
 Use this data source to list all of your [integrations](https://www.runscope.com/docs/api/integrations)
 that you can use with other runscope resources.
