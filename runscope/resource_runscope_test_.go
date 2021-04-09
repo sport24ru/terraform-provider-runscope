@@ -72,7 +72,7 @@ func resourceTestCreate(ctx context.Context, d *schema.ResourceData, meta interf
 
 	d.SetId(test.Id)
 
-	return resourceTestV2Read(ctx, d, meta)
+	return resourceTestRead(ctx, d, meta)
 }
 
 func resourceTestRead(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
@@ -114,7 +114,7 @@ func resourceTestUpdate(ctx context.Context, d *schema.ResourceData, meta interf
 		return diag.Errorf("Error updating test: %s", err)
 	}
 
-	return resourceTestV2Read(ctx, d, meta)
+	return resourceTestRead(ctx, d, meta)
 }
 
 func resourceTestDelete(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
