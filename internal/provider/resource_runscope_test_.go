@@ -1,7 +1,7 @@
 // Note this source file ends in an '_'; otherwise the compiler
 // will treat is as a test file.
 
-package runscope
+package provider
 
 import (
 	"context"

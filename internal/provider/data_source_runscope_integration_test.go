@@ -1,4 +1,4 @@
-package runscope
+package provider
 
 import (
 	"fmt"

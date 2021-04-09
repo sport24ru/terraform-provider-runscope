@@ -1,4 +1,4 @@
-package runscope
+package provider
 
 import (
 	"fmt"
@@ -8,7 +8,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
 )
 
-func TestAccDataSourceRunscopeBuckets(t *testing.T) {
+func TestAccDataSourceRunscopeBucket(t *testing.T) {
 	teamId := os.Getenv("RUNSCOPE_TEAM_ID")
 	bucketName := testAccRandomBucketName()
 
@@ -18,25 +18,22 @@ func TestAccDataSourceRunscopeBuckets(t *testing.T) {
 		CheckDestroy:      testAccCheckBucketDestroy,
 		Steps: []resource.TestStep{
 			{
-				Config: fmt.Sprintf(testAccDataSourceRunscopeBucketsConfig, teamId, bucketName),
+				Config: fmt.Sprintf(testAccDataSourceRunscopeBucketConfig, bucketName, teamId),
 				Check: resource.ComposeTestCheckFunc(
-					resource.TestCheckResourceAttr("data.runscope_buckets.test", "keys.#", "1"),
+					resource.TestCheckResourceAttr("data.runscope_bucket.test", "name", bucketName),
 				),
 			},
 		},
 	})
 }
 
-const testAccDataSourceRunscopeBucketsConfig = `
+const testAccDataSourceRunscopeBucketConfig = `
 resource "runscope_bucket" "test" {
-  team_uuid = "%s"
   name      = "%s"
+  team_uuid = "%s"
 }
 
-data "runscope_buckets" "test" {
-  filter {
-    name   = "name"
-    values = [runscope_bucket.test.name]
-  }
+data "runscope_bucket" "test" {
+  key = runscope_bucket.test.id
 }
 `

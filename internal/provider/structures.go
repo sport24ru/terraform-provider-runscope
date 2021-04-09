@@ -1,4 +1,4 @@
-package runscope
+package provider
 
 import "github.com/terraform-providers/terraform-provider-runscope/internal/runscope"
 

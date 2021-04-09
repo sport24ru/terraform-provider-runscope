@@ -1,4 +1,4 @@
-package runscope
+package provider
 
 // Takes the result of flatmap.Expand for an array of strings
 // and returns a []*string
