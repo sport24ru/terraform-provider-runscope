@@ -1,17 +1,20 @@
 package schema
 
 type EnvironmentBase struct {
-	Name             string                   `json:"name"`
-	Script           string                   `json:"script"`
-	PreserveCookies  bool                     `json:"preserve_cookies"`
-	InitialVariables map[string]string        `json:"initial_variables"`
-	Integrations     []EnvironmentIntegration `json:"integrations"`
-	Regions          []string                 `json:"regions"`
-	RemoteAgents     []RemoteAgent            `json:"remote_agents"`
-	RetryOnFailure   bool                     `json:"retry_on_failure"`
-	VerifySSL        bool                     `json:"verify_ssl"`
-	Webhooks         []string                 `json:"webhooks"`
-	Emails           Emails                   `json:"emails"`
+	Name                string                   `json:"name"`
+	Script              string                   `json:"script"`
+	PreserveCookies     bool                     `json:"preserve_cookies"`
+	InitialVariables    map[string]string        `json:"initial_variables"`
+	Integrations        []EnvironmentIntegration `json:"integrations"`
+	Regions             []string                 `json:"regions"`
+	RemoteAgents        []RemoteAgent            `json:"remote_agents"`
+	RetryOnFailure      bool                     `json:"retry_on_failure"`
+	StopOnFailure       bool                     `json:"stop_on_failure"`
+	VerifySSL           bool                     `json:"verify_ssl"`
+	Webhooks            []string                 `json:"webhooks"`
+	Emails              Emails                   `json:"emails"`
+	ParentEnvironmentId string                   `json:"parent_environment_id,omitempty"`
+	ClientCertificate   string                   `json:"client_certificate"`
 }
 
 type Environment struct {

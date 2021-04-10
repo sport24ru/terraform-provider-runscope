@@ -29,3 +29,7 @@ The following attributes are exported:
 * `id` - The unique key of the found bucket.
 * `team_uuid` - The team unique identifier that owns the bucket.
 * `name` - Type name of the bucket.
+* `auth_token` - Bucket auth token if set.
+* `default` - `true` if this bucket is the 'default' for a team.
+* `verify_ssl` - `true` if this bucket is configured to verify ssl for requests made to it.
+* `trigger_url` - URL to trigger a test run for all tests within a bucket.

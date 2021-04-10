@@ -2,7 +2,7 @@
 
 An [environment](https://www.runscope.com/docs/api/environments) resource.
 An [environment](https://www.runscope.com/docs/api-testing/environments)
-is is a group of configuration settings (initial variables, locations,
+is a group of configuration settings (initial variables, locations,
 notifications, integrations, etc.) used when running a test.
 Every test has at least one environment, but you can create additional
 environments as needed. For common settings (base URLs, API keys)
@@ -90,8 +90,13 @@ The following arguments are supported:
 * `regions` - (Optional) A list of [Runscope regions](https://www.runscope.com/docs/regions) to execute test runs in when using this environment.
 * `remote_agent` - (Optional) Block describing the properties of [Remote Agent](https://www.runscope.com/docs/api/agents) to execute test runs in when using this environment. May be declared multiple times.
   Remote Agent documented below.
+* `retry_on_failure` - (Optional) If this is set to true, an additional test run will be triggered immediately after a failed scheduled test run.
+* `stop_on_failure` - (Optional) If this is set to true, test runs will stop executing after the first step that fails. All subsequent steps will be skipped.
+* `verify_ssl` - (Optional) If this is set to false, tests using this environment won't verify SSL certificates.
 * `webhooks` - (Optional) A list of URL's to send results to when test runs using this environment finish.
-* `email` - (Optional) Block describing settings for sending email notifications upon completion of a test run using this environment. May be declared multiple times. Emails block is documented below
+* `email` - (Optional) Block describing settings for sending email notifications upon completion of a test run using this environment. May be declared multiple times. Emails block is documented below.
+* `parent_environment_id` - (Optional) The parent environment to inherit from, applies only to test-specific environments.
+* `client_certificate` - (Optional) Client certificate text available to be used in request authentication. PEM-encoded.
 
 Remote Agent (`remote_agent`) supports the following:
 
@@ -100,16 +105,14 @@ Remote Agent (`remote_agent`) supports the following:
 
 Email (`email`) supports the following:
 
-* `notify_all` - (Required) Send an email to all team members according to the `notify_on` rules.
-* `notify_on` - (Required) Upon completion of a test run Runscope will send email notifications, allowed values: `all`, `failures`, `threshold` or `switch`
-* `notify_threshold` (Required) An integer between 1 and 10 for use with the `notify_on settings`: only used when `threshold` and `switch` values are given
-* `recipient` (Required) Block describing recipient, documented below. May be declared multiple times.
+* `notify_all` - (Optional) Send an email to all team members according to the `notify_on` rules.
+* `notify_on` - (Optional) Upon completion of a test run Runscope will send email notifications, allowed values: `all`, `failures`, `threshold` or `switch`
+* `notify_threshold` (Optional) An integer between 1 and 10 for use with the `notify_on settings`: only used when `threshold` and `switch` values are given
+* `recipient` (Optional) Block describing recipient, documented below. May be declared multiple times.
 
 Recipient (`recipient`), See [team api](https://www.runscope.com/docs/api/teams), supports the following:
 
-* `name` - (Optional) The name of the person.
-* `id` - (Optional) The unique identifier for this person's account.
-* `email` - (Optional) The email address for this account.
+* `id` - (Required) The unique identifier for this person's account.
 
 ## Attributes Reference
 

@@ -1,6 +1,9 @@
 package provider
 
-import "github.com/terraform-providers/terraform-provider-runscope/internal/runscope"
+import (
+	"github.com/terraform-providers/terraform-provider-runscope/internal/runscope"
+	"time"
+)
 
 func expandStringSlice(s []interface{}) []string {
 	result := make([]string, len(s), len(s))
@@ -42,6 +45,19 @@ func flattenStepHeaders(headers map[string][]string) []interface{} {
 			result = append(result, map[string]interface{}{
 				"header": header,
 				"value":  value,
+			})
+		}
+	}
+	return result
+}
+
+func flattenFormParameters(form map[string][]string) []interface{} {
+	result := []interface{}{}
+	for name, values := range form {
+		for _, value := range values {
+			result = append(result, map[string]interface{}{
+				"name":  name,
+				"value": value,
 			})
 		}
 	}
@@ -97,6 +113,20 @@ func expandStepHeaders(headers []interface{}) map[string][]string {
 	return result
 }
 
+func expandStepForm(formParameters []interface{}) map[string][]string {
+	result := map[string][]string{}
+	for _, fp := range formParameters {
+		formParameter := fp.(map[string]interface{})
+		name := formParameter["name"].(string)
+		value := formParameter["value"].(string)
+		if _, ok := result[name]; !ok {
+			result[name] = []string{}
+		}
+		result[name] = append(result[name], value)
+	}
+	return result
+}
+
 func expandStepAuth(auth []interface{}) runscope.StepAuth {
 	result := runscope.StepAuth{}
 	if len(auth) > 0 {
@@ -106,4 +136,20 @@ func expandStepAuth(auth []interface{}) runscope.StepAuth {
 		result.AuthType = a["auth_type"].(string)
 	}
 	return result
+}
+
+func flattenTime(t time.Time) string {
+	if t.Unix() == 0 {
+		return ""
+	}
+
+	return t.Format(time.RFC1123)
+}
+
+func flattenCreatedBy(c *runscope.CreatedBy) []map[string]interface{} {
+	return []map[string]interface{}{{
+		"id":    c.Id,
+		"name":  c.Name,
+		"email": c.Email,
+	}}
 }

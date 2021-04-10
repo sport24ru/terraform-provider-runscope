@@ -12,12 +12,21 @@ type TestBase struct {
 
 type Test struct {
 	TestBase
-	Id    string     `json:"id"`
-	Steps []TestStep `json:"steps"`
+	Id         string     `json:"id"`
+	Steps      []TestStep `json:"steps"`
+	CreatedAt  int64      `json:"created_at"`
+	CreatedBy  CreatedBy  `json:"created_by"`
+	TriggerURL string     `json:"trigger_url"`
 }
 
 type TestStep struct {
 	Id string `json:"id"`
+}
+
+type CreatedBy struct {
+	Id    string `json:"id"`
+	Name  string `json:"name"`
+	Email string `json:"email"`
 }
 
 type TestGetResponse struct {

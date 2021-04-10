@@ -89,13 +89,11 @@ func resourceRunscopeStep() *schema.Resource {
 			},
 			"method": {
 				Type:     schema.TypeString,
-				Optional: true,
-				ForceNew: true,
+				Required: true,
 			},
 			"url": {
 				Type:     schema.TypeString,
-				Optional: true,
-				ForceNew: false,
+				Required: true,
 			},
 			"variable": {
 				Type: schema.TypeSet,
@@ -181,6 +179,22 @@ func resourceRunscopeStep() *schema.Resource {
 				Type:     schema.TypeString,
 				Optional: true,
 			},
+			"form_parameter": {
+				Type:     schema.TypeSet,
+				Optional: true,
+				Elem: &schema.Resource{
+					Schema: map[string]*schema.Schema{
+						"name": {
+							Type:     schema.TypeString,
+							Required: true,
+						},
+						"value": {
+							Type:     schema.TypeString,
+							Required: true,
+						},
+					},
+				},
+			},
 			"scripts": {
 				Type:     schema.TypeList,
 				Optional: true,
@@ -193,6 +207,10 @@ func resourceRunscopeStep() *schema.Resource {
 			},
 			"note": {
 				Type:     schema.TypeString,
+				Optional: true,
+			},
+			"skipped": {
+				Type:     schema.TypeBool,
 				Optional: true,
 			},
 		},
@@ -244,9 +262,11 @@ func resourceStepRead(ctx context.Context, d *schema.ResourceData, meta interfac
 		d.Set("auth", flattenStepAuth(step.Auth))
 	}
 	d.Set("body", step.Body)
+	d.Set("form_parameter", flattenFormParameters(step.Form))
 	d.Set("scripts", step.Scripts)
 	d.Set("before_scripts", step.BeforeScripts)
 	d.Set("note", step.Note)
+	d.Set("skipped", step.Skipped)
 
 	return nil
 }
@@ -312,6 +332,9 @@ func expandStepBaseOpts(d *schema.ResourceData, opts *runscope.StepBaseOpts) {
 	if v, ok := d.GetOk("body"); ok {
 		opts.Body = v.(string)
 	}
+	if v, ok := d.GetOk("form_parameter"); ok {
+		opts.Form = expandStepForm(v.(*schema.Set).List())
+	}
 	if v, ok := d.GetOk("scripts"); ok {
 		opts.Scripts = expandStringSlice(v.([]interface{}))
 	}
@@ -320,5 +343,8 @@ func expandStepBaseOpts(d *schema.ResourceData, opts *runscope.StepBaseOpts) {
 	}
 	if v, ok := d.GetOk("note"); ok {
 		opts.Note = v.(string)
+	}
+	if v, ok := d.GetOk("skipped"); ok {
+		opts.Skipped = v.(bool)
 	}
 }

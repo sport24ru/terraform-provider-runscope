@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/terraform-providers/terraform-provider-runscope/internal/runscope/schema"
+	"time"
 )
 
 type ScheduleBase struct {
@@ -14,7 +15,8 @@ type ScheduleBase struct {
 
 type Schedule struct {
 	ScheduleBase
-	Id string
+	Id         string
+	ExportedAt time.Time
 }
 
 type ScheduleClient struct {
@@ -27,20 +29,21 @@ func ScheduleFromSchema(s *schema.Schedule) *Schedule {
 	schedule.EnvironmentId = s.EnvironmentId
 	schedule.Interval = s.Interval
 	schedule.Note = s.Note
+	schedule.ExportedAt = time.Unix(s.ExportedAt, 0)
 	return schedule
 }
 
-type ScheduleBaseOpts struct {
+type ScheduleURLOpts struct {
 	BucketId string
 	TestId   string
 }
 
-func (opts *ScheduleBaseOpts) URL() string {
+func (opts *ScheduleURLOpts) URL() string {
 	return fmt.Sprintf("/buckets/%s/tests/%s/schedules", opts.BucketId, opts.TestId)
 }
 
 type ScheduleCreateOpts struct {
-	ScheduleBaseOpts
+	ScheduleURLOpts
 	ScheduleBase
 }
 
@@ -65,12 +68,12 @@ func (c *ScheduleClient) Create(ctx context.Context, opts *ScheduleCreateOpts) (
 }
 
 type ScheduleGetOpts struct {
-	ScheduleBaseOpts
+	ScheduleURLOpts
 	Id string
 }
 
 func (opts *ScheduleGetOpts) URL() string {
-	return fmt.Sprintf("%s/%s", opts.ScheduleBaseOpts.URL(), opts.Id)
+	return fmt.Sprintf("%s/%s", opts.ScheduleURLOpts.URL(), opts.Id)
 }
 
 func (c *ScheduleClient) Get(ctx context.Context, opts *ScheduleGetOpts) (*Schedule, error) {
@@ -80,6 +83,35 @@ func (c *ScheduleClient) Get(ctx context.Context, opts *ScheduleGetOpts) (*Sched
 	}
 
 	var resp schema.ScheduleGetResponse
+	err = c.client.Do(req, &resp)
+	if err != nil {
+		return nil, err
+	}
+
+	return ScheduleFromSchema(&resp.Schedule), err
+}
+
+type ScheduleUpdateOpts struct {
+	ScheduleGetOpts
+	ScheduleBase
+}
+
+func (opts *ScheduleUpdateOpts) setRequest(body *schema.ScheduleUpdateRequest) {
+	body.Note = opts.Note
+	body.Interval = opts.Interval
+	body.EnvironmentId = opts.EnvironmentId
+}
+
+func (c *ScheduleClient) Update(ctx context.Context, opts *ScheduleUpdateOpts) (*Schedule, error) {
+	body := schema.ScheduleUpdateRequest{}
+	opts.setRequest(&body)
+
+	req, err := c.client.NewRequest(ctx, "PUT", opts.URL(), &body)
+	if err != nil {
+		return nil, err
+	}
+
+	var resp schema.ScheduleUpdateResponse
 	err = c.client.Do(req, &resp)
 	if err != nil {
 		return nil, err

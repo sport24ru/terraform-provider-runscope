@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/terraform-providers/terraform-provider-runscope/internal/runscope/schema"
+	"time"
 )
 
 type TestMinimal struct {
@@ -21,10 +22,20 @@ type Test struct {
 	Id                   string
 	DefaultEnvironmentId string
 	Steps                []TestStep
+	CreatedAt            time.Time
+	CreatedBy            CreatedBy
+	LastRun              time.Time
+	TriggerURL           string
 }
 
 type TestStep struct {
 	Id string
+}
+
+type CreatedBy struct {
+	Id    string
+	Name  string
+	Email string
 }
 
 type TestClient struct {
@@ -41,6 +52,13 @@ func TestFromSchema(s schema.Test) *Test {
 	for i, step := range s.Steps {
 		test.Steps[i].Id = step.Id
 	}
+	test.CreatedAt = time.Unix(s.CreatedAt, 0)
+	test.CreatedBy = CreatedBy{
+		Id:    s.CreatedBy.Id,
+		Name:  s.CreatedBy.Name,
+		Email: s.CreatedBy.Email,
+	}
+	test.TriggerURL = s.TriggerURL
 	return test
 }
 

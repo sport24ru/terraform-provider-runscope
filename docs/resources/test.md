@@ -35,6 +35,10 @@ The following attributes are exported:
 * `id` - The unique identifier for the test.
 * `name` - The name of this test.
 * `description` - Human-readable description of the new test.
+* `default_environment_id` - The default environment for the test.
+* `created_at` - Date the test was created (in Epoch time).
+* `created_by` - Details of the user who created this test.
+* `trigger_url` - The trigger URL for this test.
 
 ## Import
 

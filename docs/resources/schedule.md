@@ -9,8 +9,8 @@ using a unique Test-specific or Shared [Environment](environment.html).
 
 ```hcl
 resource "runscope_bucket" "bucket" {
-    name      = "terraform-provider-test"
-    team_uuid = "d038db69-b5a9-45af-80d8-3be47c37e309"
+  name      = "terraform-provider-test"
+  team_uuid = "d038db69-b5a9-45af-80d8-3be47c37e309"
 }
 
 resource "runscope_test" "test" {
@@ -30,11 +30,11 @@ resource "runscope_environment" "environment" {
 }
 
 resource "runscope_schedule" "daily" {
-    bucket_id      = runscope_bucket.bucket.id
-    test_id        = runscope_test.test.id
-    interval       = "1d"
-    note           = "This is a daily schedule"
-    environment_id = runscope_environment.environment.id
+  bucket_id      = runscope_bucket.bucket.id
+  test_id        = runscope_test.test.id
+  interval       = "1d"
+  note           = "This is a daily schedule"
+  environment_id = runscope_environment.environment.id
 }
 ```
 

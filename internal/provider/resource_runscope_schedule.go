@@ -13,6 +13,7 @@ func resourceRunscopeSchedule() *schema.Resource {
 	return &schema.Resource{
 		CreateContext: resourceScheduleCreate,
 		ReadContext:   resourceScheduleRead,
+		UpdateContext: resourceScheduleUpdate,
 		DeleteContext: resourceScheduleDelete,
 
 		Schema: map[string]*schema.Schema{
@@ -29,18 +30,18 @@ func resourceRunscopeSchedule() *schema.Resource {
 			"environment_id": {
 				Type:     schema.TypeString,
 				Required: true,
-				ForceNew: true,
 			},
 			"interval": {
 				Type:     schema.TypeString,
-				Optional: true,
-				ForceNew: true,
+				Required: true,
 			},
 			"note": {
 				Type:     schema.TypeString,
-				Required: false,
 				Optional: true,
-				ForceNew: true,
+			},
+			"exported_at": {
+				Type:     schema.TypeString,
+				Computed: true,
 			},
 		},
 	}
@@ -51,7 +52,7 @@ func resourceScheduleCreate(ctx context.Context, d *schema.ResourceData, meta in
 
 	opts := &runscope.ScheduleCreateOpts{}
 	opts.EnvironmentId = d.Get("environment_id").(string)
-	expandScheduleBaseOpts(d, &opts.ScheduleBaseOpts)
+	expandScheduleBaseOpts(d, &opts.ScheduleURLOpts)
 	if v, ok := d.GetOk("interval"); ok {
 		opts.Interval = v.(string)
 	}
@@ -93,7 +94,27 @@ func resourceScheduleRead(ctx context.Context, d *schema.ResourceData, meta inte
 	d.Set("environment_id", schedule.EnvironmentId)
 	d.Set("interval", strings.ReplaceAll(schedule.Interval, ".0", ""))
 	d.Set("note", schedule.Note)
+	d.Set("exported_at", flattenTime(schedule.ExportedAt))
 	return nil
+}
+
+func resourceScheduleUpdate(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
+	client := meta.(*providerConfig).client
+
+	opts := runscope.ScheduleUpdateOpts{}
+	opts.Id = d.Id()
+	opts.BucketId = d.Get("bucket_id").(string)
+	opts.TestId = d.Get("test_id").(string)
+	opts.EnvironmentId = d.Get("environment_id").(string)
+	opts.Interval = d.Get("interval").(string)
+	opts.Note = d.Get("note").(string)
+
+	_, err := client.Schedule.Update(ctx, &opts)
+	if err != nil {
+		return diag.Errorf("Error updating schedule: %s", err)
+	}
+
+	return resourceScheduleRead(ctx, d, meta)
 }
 
 func resourceScheduleDelete(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
@@ -109,12 +130,12 @@ func resourceScheduleDelete(ctx context.Context, d *schema.ResourceData, meta in
 	return nil
 }
 
-func expandScheduleBaseOpts(d *schema.ResourceData, opts *runscope.ScheduleBaseOpts) {
+func expandScheduleBaseOpts(d *schema.ResourceData, opts *runscope.ScheduleURLOpts) {
 	opts.BucketId = d.Get("bucket_id").(string)
 	opts.TestId = d.Get("test_id").(string)
 }
 
 func expandScheduleGetOpts(d *schema.ResourceData, opts *runscope.ScheduleGetOpts) {
 	opts.Id = d.Id()
-	expandScheduleBaseOpts(d, &opts.ScheduleBaseOpts)
+	expandScheduleBaseOpts(d, &opts.ScheduleURLOpts)
 }

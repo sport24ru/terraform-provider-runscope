@@ -12,6 +12,13 @@ import (
 	"github.com/hashicorp/terraform-plugin-sdk/v2/terraform"
 )
 
+func init() {
+	resource.AddTestSweepers("runscope_bucket", &resource.Sweeper{
+		Name: "runscope_bucket",
+		F:    testAccSweepBuckets,
+	})
+}
+
 func TestAccBucket_basic(t *testing.T) {
 	var bucket runscope.Bucket
 	teamId := os.Getenv("RUNSCOPE_TEAM_ID")
@@ -23,43 +30,21 @@ func TestAccBucket_basic(t *testing.T) {
 		CheckDestroy:      testAccCheckBucketDestroy,
 		Steps: []resource.TestStep{
 			{
-				Config: fmt.Sprintf(testRunscopeBucketConfigA, bucketName, teamId),
+				Config: fmt.Sprintf(testAccRunscopeBucketBasicConfig, bucketName, teamId),
 				Check: resource.ComposeTestCheckFunc(
 					testAccCheckBucketExists("runscope_bucket.bucket", &bucket),
-					resource.TestCheckResourceAttr(
-						"runscope_bucket.bucket", "name", bucketName),
+					resource.TestCheckResourceAttr("runscope_bucket.bucket", "name", bucketName),
+					resource.TestCheckResourceAttr("runscope_bucket.bucket", "team_uuid", teamId),
+					resource.TestCheckResourceAttrSet("runscope_bucket.bucket", "default"),
+					resource.TestCheckResourceAttrSet("runscope_bucket.bucket", "verify_ssl"),
+					resource.TestCheckResourceAttrSet("runscope_bucket.bucket", "trigger_url"),
 				),
 			},
-		},
-	})
-}
-
-func init() {
-	resource.AddTestSweepers("runscope_bucket", &resource.Sweeper{
-		Name: "runscope_bucket",
-		F: func(region string) error {
-			ctx := context.Background()
-
-			client := runscope.NewClient(runscope.WithToken(os.Getenv("RUNSCOPE_ACCESS_TOKEN")))
-
-			buckets, err := client.Bucket.List(ctx)
-			if err != nil {
-				return fmt.Errorf("Couldn't list bucket for sweeping")
-			}
-
-			for _, bucket := range buckets {
-				if !(strings.HasPrefix(bucket.Name, testAccBucketNamePrefix) || bucket.Name == "terraform-provider-test") {
-					continue
-				}
-
-				opts := &runscope.BucketDeleteOpts{}
-				opts.Key = bucket.Key
-				if err := client.Bucket.Delete(ctx, opts); err != nil {
-					return err
-				}
-			}
-
-			return nil
+			{
+				ResourceName:      "runscope_bucket.bucket",
+				ImportState:       true,
+				ImportStateVerify: true,
+			},
 		},
 	})
 }
@@ -69,53 +54,72 @@ func testAccCheckBucketDestroy(s *terraform.State) error {
 	client := testAccProvider.Meta().(*providerConfig).client
 
 	for _, rs := range s.RootModule().Resources {
-		if rs.Type != "runscope_bucket" {
-			continue
-		}
-
-		_, err := client.Bucket.Get(ctx, &runscope.BucketGetOpts{Key: rs.Primary.ID})
-
-		if err == nil {
-			return fmt.Errorf("Record %s still exists", rs.Primary.ID)
+		if rs.Type == "runscope_bucket" {
+			if _, err := client.Bucket.Get(ctx, &runscope.BucketGetOpts{Key: rs.Primary.ID}); err == nil {
+				return fmt.Errorf("Record %s still exists", rs.Primary.ID)
+			}
 		}
 	}
 
 	return nil
 }
 
-func testAccCheckBucketExists(n string, bucket *runscope.Bucket) resource.TestCheckFunc {
+func testAccCheckBucketExists(n string, b *runscope.Bucket) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
 		ctx := context.Background()
-		rs, ok := s.RootModule().Resources[n]
 
+		rs, ok := s.RootModule().Resources[n]
 		if !ok {
 			return fmt.Errorf("Not found: %s", n)
 		}
-
 		if rs.Primary.ID == "" {
 			return fmt.Errorf("No Record ID is set")
 		}
 
 		client := testAccProvider.Meta().(*providerConfig).client
 
-		foundRecord, err := client.Bucket.Get(ctx, &runscope.BucketGetOpts{Key: rs.Primary.ID})
-
+		bucket, err := client.Bucket.Get(ctx, &runscope.BucketGetOpts{Key: rs.Primary.ID})
 		if err != nil {
 			return err
 		}
 
-		if foundRecord.Key != rs.Primary.ID {
+		if bucket.Key != rs.Primary.ID {
 			return fmt.Errorf("Record not found")
 		}
 
-		bucket = foundRecord
+		*b = *bucket
 
 		return nil
 	}
 }
 
-const testRunscopeBucketConfigA = `
+const testAccRunscopeBucketBasicConfig = `
 resource "runscope_bucket" "bucket" {
   name      = "%s"
   team_uuid = "%s"
 }`
+
+func testAccSweepBuckets(_ string) error {
+	ctx := context.Background()
+
+	client := runscope.NewClient(runscope.WithToken(os.Getenv("RUNSCOPE_ACCESS_TOKEN")))
+
+	buckets, err := client.Bucket.List(ctx)
+	if err != nil {
+		return fmt.Errorf("Couldn't list bucket for sweeping")
+	}
+
+	for _, bucket := range buckets {
+		if !(strings.HasPrefix(bucket.Name, testAccBucketNamePrefix) || bucket.Name == "terraform-provider-test") {
+			continue
+		}
+
+		opts := &runscope.BucketDeleteOpts{}
+		opts.Key = bucket.Key
+		if err := client.Bucket.Delete(ctx, opts); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}

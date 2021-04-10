@@ -21,6 +21,10 @@ func TestAccDataSourceRunscopeBucket(t *testing.T) {
 				Config: fmt.Sprintf(testAccDataSourceRunscopeBucketConfig, bucketName, teamId),
 				Check: resource.ComposeTestCheckFunc(
 					resource.TestCheckResourceAttr("data.runscope_bucket.test", "name", bucketName),
+					resource.TestCheckResourceAttr("data.runscope_bucket.test", "team_uuid", teamId),
+					resource.TestCheckResourceAttrSet("data.runscope_bucket.test", "default"),
+					resource.TestCheckResourceAttrSet("data.runscope_bucket.test", "verify_ssl"),
+					resource.TestCheckResourceAttrSet("data.runscope_bucket.test", "trigger_url"),
 				),
 			},
 		},

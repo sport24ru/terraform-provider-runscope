@@ -31,6 +31,20 @@ func TestUnmarshallTestCreateResponse(t *testing.T) {
 	if resp.Test.DefaultEnvironmentId != expectedDefaultEnvironmentId {
 		t.Errorf("expected DefaultEnvironmentId '%s', got '%s'", expectedDefaultEnvironmentId, resp.Test.DefaultEnvironmentId)
 	}
+
+	var expectedCreatedAt int64 = 1438832081
+	if resp.CreatedAt != expectedCreatedAt {
+		t.Errorf("expected CreatedAt '%d', got '%d'", expectedCreatedAt, resp.CreatedAt)
+	}
+
+	expectedCreatedBy := CreatedBy{
+		Id:    "4ee15ecc-7fe1-43cb-aa12-ef50420f2cf9",
+		Name:  "Grace Hopper",
+		Email: "grace@example.com",
+	}
+	if resp.CreatedBy != expectedCreatedBy {
+		t.Errorf("expected CreatedBy '%+v', got '%+v'", expectedCreatedBy, resp.CreatedBy)
+	}
 }
 
 const runscopeTestCreateOkResponse = `{

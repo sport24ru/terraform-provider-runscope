@@ -8,9 +8,13 @@ import (
 )
 
 type Bucket struct {
-	Key  string
-	Name string
-	Team Team
+	Key        string
+	Name       string
+	Team       Team
+	AuthToken  string
+	Default    bool
+	VerifySSL  bool
+	TriggerURL string
 }
 
 type Team struct {
@@ -22,7 +26,7 @@ type BucketClient struct {
 	client *Client
 }
 
-func BucketFromSchema(s schema.Bucket) *Bucket {
+func BucketFromSchema(s *schema.Bucket) *Bucket {
 	return &Bucket{
 		Key:  s.Key,
 		Name: s.Name,
@@ -30,6 +34,10 @@ func BucketFromSchema(s schema.Bucket) *Bucket {
 			Name: s.Team.Name,
 			UUID: s.Team.Id,
 		},
+		AuthToken:  s.AuthToken,
+		Default:    s.Default,
+		VerifySSL:  s.VerifySSL,
+		TriggerURL: s.TriggerURL,
 	}
 }
 
@@ -57,7 +65,7 @@ func (c *BucketClient) Create(ctx context.Context, opts *BucketCreateOpts) (*Buc
 		return nil, err
 	}
 
-	return BucketFromSchema(resp.Bucket), err
+	return BucketFromSchema(&resp.Bucket), err
 }
 
 type BucketGetOpts struct {
@@ -80,7 +88,7 @@ func (c *BucketClient) Get(ctx context.Context, opts *BucketGetOpts) (*Bucket, e
 		return nil, err
 	}
 
-	return BucketFromSchema(resp.Bucket), nil
+	return BucketFromSchema(&resp.Bucket), nil
 }
 
 func (c *BucketClient) List(ctx context.Context) ([]*Bucket, error) {
@@ -96,7 +104,7 @@ func (c *BucketClient) List(ctx context.Context) ([]*Bucket, error) {
 	}
 	buckets := make([]*Bucket, len(resp.Buckets), len(resp.Buckets))
 	for i, bucket := range resp.Buckets {
-		buckets[i] = BucketFromSchema(bucket)
+		buckets[i] = BucketFromSchema(&bucket)
 	}
 
 	return buckets, nil

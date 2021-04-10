@@ -15,9 +15,11 @@ type StepBase struct {
 	Headers       map[string][]string
 	Auth          StepAuth
 	Body          string
+	Form          map[string][]string
 	Scripts       []string
 	BeforeScripts []string
 	Note          string
+	Skipped       bool
 }
 
 func (sb *StepBase) setFromSchema(s *schema.Step) {
@@ -33,9 +35,11 @@ func (sb *StepBase) setFromSchema(s *schema.Step) {
 		AuthType: s.Auth.AuthType,
 	}
 	sb.Body = s.Body
+	sb.Form = map[string][]string{}
 	sb.Scripts = make([]string, len(s.Scripts))
 	sb.BeforeScripts = make([]string, len(s.BeforeScripts))
 	sb.Note = s.Note
+	sb.Skipped = s.Skipped
 
 	for i, v := range s.Variables {
 		sb.Variables[i] = StepVariable{
@@ -56,6 +60,12 @@ func (sb *StepBase) setFromSchema(s *schema.Step) {
 		sb.Headers[header] = make([]string, len(values))
 		for i, v := range values {
 			sb.Headers[header][i] = v
+		}
+	}
+	for name, values := range s.Form {
+		sb.Form[name] = make([]string, len(values))
+		for i, v := range values {
+			sb.Form[name][i] = v
 		}
 	}
 	for i, s := range s.Scripts {
@@ -125,9 +135,11 @@ type StepBaseOpts struct {
 	Headers       map[string][]string
 	Auth          StepAuth
 	Body          string
+	Form          map[string][]string
 	Scripts       []string
 	BeforeScripts []string
 	Note          string
+	Skipped       bool
 }
 
 func (sbo *StepBaseOpts) setRequest(sb *schema.StepBase) {
@@ -143,9 +155,11 @@ func (sbo *StepBaseOpts) setRequest(sb *schema.StepBase) {
 		AuthType: sbo.Auth.AuthType,
 	}
 	sb.Body = sbo.Body
+	sb.Form = map[string][]string{}
 	sb.Scripts = make([]string, len(sbo.Scripts))
 	sb.BeforeScripts = make([]string, len(sbo.BeforeScripts))
 	sb.Note = sbo.Note
+	sb.Skipped = sbo.Skipped
 
 	for i, v := range sbo.Variables {
 		sb.Variables[i] = schema.StepVariable{
@@ -166,6 +180,12 @@ func (sbo *StepBaseOpts) setRequest(sb *schema.StepBase) {
 		sb.Headers[header] = make([]string, len(values))
 		for i, v := range values {
 			sb.Headers[header][i] = v
+		}
+	}
+	for name, values := range sbo.Form {
+		sb.Form[name] = make([]string, len(values))
+		for i, v := range values {
+			sb.Form[name][i] = v
 		}
 	}
 	for i, s := range sbo.Scripts {
@@ -244,7 +264,7 @@ func (c *StepClient) Update(ctx context.Context, opts *StepUpdateOpts) (*Step, e
 		return nil, err
 	}
 
-	return StepFromSchema(&resp.Step[0]), nil
+	return StepFromSchema(&resp.Step), nil
 }
 
 type StepDeleteOpts struct {
