@@ -1,8 +1,12 @@
 ### Create bucket
-POST https://api.runscope.com/buckets?name=terraform-provider-staging&team_uuid={{ team_uuid }}
+POST https://api.runscope.com/buckets?name=goland-bucket&team_uuid={{ team_uuid }}
 Authorization: Bearer {{api_token}}
 
 > {% client.global.set("bucket_id", response.body.data.key); %}
+
+### Get bucket
+GET https://api.runscope.com/buckets/{{bucket_id}}
+Authorization: Bearer {{api_token}}
 
 ### List buckets
 GET https://api.runscope.com/buckets
@@ -13,9 +17,139 @@ POST https://api.runscope.com/buckets/{{bucket_id}}/tests
 Authorization: Bearer {{api_token}}
 Content-Type: application/json
 
-{"name": "Sample Name","description": "My test description"}
+{
+  "name": "goland-test"
+}
 
 > {% client.global.set("test_id", response.body.data.id); %}
+
+### Get test
+GET https://api.runscope.com/buckets/{{bucket_id}}/tests/{{test_id}}
+Authorization: Bearer {{api_token}}
+
+### Create test step
+POST https://api.runscope.com/buckets/{{bucket_id}}/tests/{{test_id}}/steps
+Authorization: Bearer {{api_token}}
+Content-Type: application/json
+
+{
+  "step_type": "request",
+  "method": "GET",
+  "url": "https://example.org"
+}
+
+> {% client.global.set("step_id", (response.body.data.length > 0) ? response.body.data[response.body.data.length-1].id : ""); %}
+
+### Get test step
+GET https://api.runscope.com/buckets/{{bucket_id}}/tests/{{test_id}}/steps/{{step_id}}
+Authorization: Bearer {{api_token}}
+
+### Update test step
+PUT https://api.runscope.com/buckets/{{bucket_id}}/tests/{{test_id}}/steps/{{step_id}}
+Authorization: Bearer {{api_token}}
+Content-Type: application/json
+
+{
+  "step_type": "request",
+  "method": "POST",
+  "url": "https://yourapihere.com/example/path",
+  "body": "a",
+  "form": {
+    "b": ["1"]
+  }
+}
+
+### Delete test step
+DELETE https://api.runscope.com/buckets/{{bucket_id}}/tests/{{test_id}}/steps/{{step_id}}
+Authorization: Bearer {{api_token}}
+
+### Delete test
+DELETE https://api.runscope.com/buckets/{{bucket_id}}/tests/{{test_id}}
+Authorization: Bearer {{api_token}}
+
+### Get test environment
+GET https://api.runscope.com/buckets/{{bucket_id}}/tests/{{test_id}}/environments/{{environment_id}}
+Authorization: Bearer {{api_token}}
+
+### List shared environments
+GET https://api.runscope.com/buckets/{{bucket_id}}/environments
+Authorization: Bearer {{api_token}}
+
+### Create shared environment
+POST https://api.runscope.com/buckets/{{bucket_id}}/environments
+Authorization: Bearer {{api_token}}
+Content-Type: application/json
+
+{
+  "name": "goland-shared-environment"
+}
+
+> {% client.global.set("environment_id", response.body.data.id); %}
+
+### Create test environment
+POST https://api.runscope.com/buckets/{{bucket_id}}/tests/{{test_id}}/environments
+Authorization: Bearer {{api_token}}
+Content-Type: application/json
+
+{
+  "name": "goland-test-environment"
+}
+
+> {% client.global.set("environment_id", response.body.data.id); %}
+
+### Update shared environment
+PUT https://api.runscope.com/buckets/{{bucket_id}}/environments/{{environment_id}}
+Authorization: Bearer {{api_token}}
+Content-Type: application/json
+
+{
+  "initial_variables": {
+    "a": "b"
+  }
+}
+
+### Update test environment
+PUT https://api.runscope.com/buckets/{{bucket_id}}/tests/{{test_id}}/environments/{{environment_id}}
+Authorization: Bearer {{api_token}}
+Content-Type: application/json
+
+{
+  "test_id": {{test1_id}}
+}
+
+### Get shared environment
+GET https://api.runscope.com/buckets/{{bucket_id}}/environments/{{environment_id}}
+Authorization: Bearer {{api_token}}
+
+### Create test schedule
+POST https://api.runscope.com/buckets/{{bucket_id}}/tests/{{test_id}}/schedules
+Authorization: Bearer {{api_token}}
+Content-Type: application/json
+
+{
+  "environment_id": "{{environment_id}}",
+  "interval": "1d"
+}
+
+> {% client.global.set("schedule_id", response.body.data.id); %}
+
+### Update test schedule
+PUT https://api.runscope.com/buckets/{{bucket_id}}/tests/{{test_id}}/schedules/{{schedule_id}}
+Authorization: Bearer {{api_token}}
+Content-Type: application/json
+
+{
+  "environment_id": "{{environment_id}}",
+  "interval": "1d"
+}
+
+### Delete schedule
+DELETE https://api.runscope.com/buckets/{{bucket_id}}/tests/{{test_id}}/schedules/{{schedule_id}}
+Authorization: Bearer {{api_token}}
+
+### Delete shared environment
+DELETE https://api.runscope.com/buckets/{{bucket_id}}/environments/{{environment_id}}
+Authorization: Bearer {{api_token}}
 
 ### Delete test
 DELETE https://api.runscope.com/buckets/{{bucket_id}}/tests/{{test_id}}

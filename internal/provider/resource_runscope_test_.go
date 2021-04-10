@@ -42,14 +42,40 @@ func resourceRunscopeTest() *schema.Resource {
 			"name": {
 				Type:     schema.TypeString,
 				Required: true,
-				ForceNew: false,
 			},
 			"description": {
 				Type:     schema.TypeString,
-				Required: true,
-				ForceNew: false,
+				Optional: true,
 			},
 			"default_environment_id": {
+				Type:     schema.TypeString,
+				Computed: true,
+			},
+			"created_at": {
+				Type:     schema.TypeString,
+				Computed: true,
+			},
+			"created_by": {
+				Type:     schema.TypeSet,
+				Computed: true,
+				Elem: &schema.Resource{
+					Schema: map[string]*schema.Schema{
+						"id": {
+							Type:     schema.TypeString,
+							Computed: true,
+						},
+						"name": {
+							Type:     schema.TypeString,
+							Computed: true,
+						},
+						"email": {
+							Type:     schema.TypeString,
+							Computed: true,
+						},
+					},
+				},
+			},
+			"trigger_url": {
 				Type:     schema.TypeString,
 				Computed: true,
 			},
@@ -96,6 +122,9 @@ func resourceTestRead(ctx context.Context, d *schema.ResourceData, meta interfac
 	d.Set("name", test.Name)
 	d.Set("description", test.Description)
 	d.Set("default_environment_id", test.DefaultEnvironmentId)
+	d.Set("created_at", flattenTime(test.CreatedAt))
+	d.Set("created_by", flattenCreatedBy(&test.CreatedBy))
+	d.Set("trigger_url", test.TriggerURL)
 	return nil
 }
 

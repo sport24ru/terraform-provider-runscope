@@ -1,3 +1,22 @@
+## 0.10.0 (April 24, 2021)
+
+ENHANCEMENTS:
+
+* Added attributes `auth_token`, `default` and `verify_ssl` of `runscope_bucket`.
+* Added attributes `stop_on_failure`, `parent_environment_id` and `client_certificate` of `runscope_environment`.
+* Only changing of `bucket_id` and `test_id` forces new `runscope_environment`.
+* Added attributes `skipped` and `form_parameter` of `runscope_step`.
+* Require arguments `method` and `url` of `runscope_step`, and don't force new step when they are changed.
+* Added attributes `created_at`, `created_by` and `trigger_url` of `runscope_test`.
+* Changing of test arguments no more forces new test.
+* Added attribute `exported_at` of `runscope_schedule`.
+* Require argument `interval` of `runscope_schedule` is required and no more forces new schedule.
+* Changing of `interval` and `note` no more forces new schedule.
+
+BUG FIXES:
+
+* Fixed issue with step updating (appeared in 0.9.1).
+
 ## 0.9.1 (April 10, 2021)
 
 NOTES:

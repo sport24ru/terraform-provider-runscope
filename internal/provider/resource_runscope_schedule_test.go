@@ -11,9 +11,10 @@ import (
 	"github.com/hashicorp/terraform-plugin-sdk/v2/terraform"
 )
 
-func TestAccSchedule_basic(t *testing.T) {
+func TestAccSchedule_create_default_schedule(t *testing.T) {
 	teamId := os.Getenv("RUNSCOPE_TEAM_ID")
 	bucketName := testAccRandomBucketName()
+	schedule := &runscope.Schedule{}
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:          func() { testAccPreCheck(t) },
@@ -21,13 +22,68 @@ func TestAccSchedule_basic(t *testing.T) {
 		CheckDestroy:      testAccCheckScheduleDestroy,
 		Steps: []resource.TestStep{
 			{
-				Config: fmt.Sprintf(testRunscopeSchedule, bucketName, teamId),
+				Config: fmt.Sprintf(testAccScheduleDefaultConfig, bucketName, teamId),
 				Check: resource.ComposeTestCheckFunc(
-					testAccCheckScheduleExists("runscope_schedule.daily"),
-					resource.TestCheckResourceAttr(
-						"runscope_schedule.daily", "note", "This is a daily schedule"),
-					resource.TestCheckResourceAttr(
-						"runscope_schedule.daily", "interval", "1d")),
+					testAccCheckScheduleExists("runscope_schedule.daily", schedule),
+					resource.TestCheckResourceAttr("runscope_schedule.daily", "interval", "1d"),
+					resource.TestCheckResourceAttr("runscope_schedule.daily", "note", ""),
+					resource.TestCheckResourceAttrSet("runscope_schedule.daily", "exported_at"),
+				),
+			},
+		},
+	})
+}
+
+func TestAccSchedule_create_custom_schedule(t *testing.T) {
+	teamId := os.Getenv("RUNSCOPE_TEAM_ID")
+	bucketName := testAccRandomBucketName()
+	schedule := &runscope.Schedule{}
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:          func() { testAccPreCheck(t) },
+		ProviderFactories: testAccProviderFactories,
+		CheckDestroy:      testAccCheckScheduleDestroy,
+		Steps: []resource.TestStep{
+			{
+				Config: fmt.Sprintf(testAccScheduleCustomConfig, bucketName, teamId),
+				Check: resource.ComposeTestCheckFunc(
+					testAccCheckScheduleExists("runscope_schedule.daily", schedule),
+					resource.TestCheckResourceAttr("runscope_schedule.daily", "interval", "6h"),
+					resource.TestCheckResourceAttr("runscope_schedule.daily", "note", "schedule note"),
+					resource.TestCheckResourceAttrSet("runscope_schedule.daily", "exported_at"),
+				),
+			},
+		},
+	})
+}
+
+func TestAccSchedule_update_schedule(t *testing.T) {
+	teamId := os.Getenv("RUNSCOPE_TEAM_ID")
+	bucketName := testAccRandomBucketName()
+	schedule := &runscope.Schedule{}
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:          func() { testAccPreCheck(t) },
+		ProviderFactories: testAccProviderFactories,
+		CheckDestroy:      testAccCheckScheduleDestroy,
+		Steps: []resource.TestStep{
+			{
+				Config: fmt.Sprintf(testAccScheduleDefaultConfig, bucketName, teamId),
+				Check: resource.ComposeTestCheckFunc(
+					testAccCheckScheduleExists("runscope_schedule.daily", schedule),
+					resource.TestCheckResourceAttr("runscope_schedule.daily", "interval", "1d"),
+					resource.TestCheckResourceAttr("runscope_schedule.daily", "note", ""),
+					resource.TestCheckResourceAttrSet("runscope_schedule.daily", "exported_at"),
+				),
+			},
+			{
+				Config: fmt.Sprintf(testAccScheduleCustomConfig, bucketName, teamId),
+				Check: resource.ComposeTestCheckFunc(
+					testAccCheckScheduleExists("runscope_schedule.daily", schedule),
+					resource.TestCheckResourceAttr("runscope_schedule.daily", "interval", "6h"),
+					resource.TestCheckResourceAttr("runscope_schedule.daily", "note", "schedule note"),
+					resource.TestCheckResourceAttrSet("runscope_schedule.daily", "exported_at"),
+				),
 			},
 		},
 	})
@@ -55,7 +111,7 @@ func testAccCheckScheduleDestroy(s *terraform.State) error {
 	return nil
 }
 
-func testAccCheckScheduleExists(n string) resource.TestCheckFunc {
+func testAccCheckScheduleExists(n string, sch *runscope.Schedule) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
 		ctx := context.Background()
 		rs, ok := s.RootModule().Resources[n]
@@ -83,12 +139,17 @@ func testAccCheckScheduleExists(n string) resource.TestCheckFunc {
 		if schedule.Id != rs.Primary.ID {
 			return fmt.Errorf("Record not found")
 		}
+		if schedule.EnvironmentId != rs.Primary.Attributes["environment_id"] {
+			return fmt.Errorf("Expected environment Id `%s`, got `%s`", schedule.EnvironmentId, rs.Primary.Attributes["environment_id"])
+		}
+
+		*sch = *schedule
 
 		return nil
 	}
 }
 
-const testRunscopeSchedule = `
+const testAccScheduleDefaultConfig = `
 resource "runscope_bucket" "bucket" {
   name      = "%s"
   team_uuid = "%s"
@@ -103,11 +164,11 @@ resource "runscope_test" "test" {
 resource "runscope_environment" "environment" {
   bucket_id = runscope_bucket.bucket.id
   name      = "test-environment"
+}
 
-  initial_variables = {
-    var1 = "true"
-    var2 = "value2"
-  }
+resource "runscope_environment" "environment2" {
+  bucket_id = runscope_bucket.bucket.id
+  name      = "test-environment2"
 }
 
 resource "runscope_schedule" "daily" {
@@ -115,6 +176,36 @@ resource "runscope_schedule" "daily" {
   test_id        = runscope_test.test.id
   environment_id = runscope_environment.environment.id
   interval       = "1d"
-  note           = "This is a daily schedule"
+}
+`
+
+const testAccScheduleCustomConfig = `
+resource "runscope_bucket" "bucket" {
+  name      = "%s"
+  team_uuid = "%s"
+}
+
+resource "runscope_test" "test" {
+  bucket_id   = runscope_bucket.bucket.id
+  name        = "runscope test"
+  description = "This is a test test..."
+}
+
+resource "runscope_environment" "environment" {
+  bucket_id = runscope_bucket.bucket.id
+  name      = "test-environment"
+}
+
+resource "runscope_environment" "environment2" {
+  bucket_id = runscope_bucket.bucket.id
+  name      = "test-environment2"
+}
+
+resource "runscope_schedule" "daily" {
+  bucket_id      = runscope_bucket.bucket.id
+  test_id        = runscope_test.test.id
+  environment_id = runscope_environment.environment2.id
+  interval       = "6h"
+  note           = "schedule note"
 }
 `

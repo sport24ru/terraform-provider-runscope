@@ -24,6 +24,23 @@ func dataSourceRunscopeBucket() *schema.Resource {
 				Type:     schema.TypeString,
 				Computed: true,
 			},
+			"auth_token": {
+				Type:      schema.TypeString,
+				Computed:  true,
+				Sensitive: true,
+			},
+			"default": {
+				Type:     schema.TypeBool,
+				Computed: true,
+			},
+			"verify_ssl": {
+				Type:     schema.TypeBool,
+				Computed: true,
+			},
+			"trigger_url": {
+				Type:     schema.TypeString,
+				Computed: true,
+			},
 		},
 	}
 }
@@ -40,6 +57,10 @@ func dataSourceRunscopeBucketRead(ctx context.Context, d *schema.ResourceData, m
 	d.SetId(bucket.Key)
 	d.Set("name", bucket.Name)
 	d.Set("team_uuid", bucket.Team.UUID)
+	d.Set("auth_token", bucket.AuthToken)
+	d.Set("default", bucket.Default)
+	d.Set("verify_ssl", bucket.VerifySSL)
+	d.Set("trigger_url", bucket.TriggerURL)
 
 	return nil
 }

@@ -7,17 +7,56 @@ import (
 )
 
 type EnvironmentBase struct {
-	Name             string
-	Script           string
-	PreserveCookies  bool
-	InitialVariables map[string]string
-	Integrations     []string
-	Regions          []string
-	RemoteAgents     []RemoteAgent
-	RetryOnFailure   bool
-	VerifySSL        bool
-	Webhooks         []string
-	Emails           Emails
+	Name                string
+	Script              string
+	PreserveCookies     bool
+	InitialVariables    map[string]string
+	Integrations        []string
+	Regions             []string
+	RemoteAgents        []RemoteAgent
+	RetryOnFailure      bool
+	StopOnFailure       bool
+	VerifySSL           bool
+	Webhooks            []string
+	Emails              Emails
+	ParentEnvironmentId string
+	ClientCertificate   string
+}
+
+func (eb *EnvironmentBase) setRequest(seb *schema.EnvironmentBase) {
+	seb.Name = eb.Name
+	seb.Script = eb.Script
+	seb.PreserveCookies = eb.PreserveCookies
+	seb.InitialVariables = eb.InitialVariables
+	seb.Regions = eb.Regions
+	seb.RetryOnFailure = eb.RetryOnFailure
+	seb.StopOnFailure = eb.StopOnFailure
+	seb.VerifySSL = eb.VerifySSL
+	seb.Webhooks = eb.Webhooks
+	seb.Emails = schema.Emails{
+		NotifyAll:       eb.Emails.NotifyAll,
+		NotifyOn:        eb.Emails.NotifyOn,
+		NotifyThreshold: eb.Emails.NotifyThreshold,
+	}
+	for _, id := range eb.Integrations {
+		seb.Integrations = append(seb.Integrations, schema.EnvironmentIntegration{Id: id})
+	}
+	for _, agent := range eb.RemoteAgents {
+		seb.RemoteAgents = append(seb.RemoteAgents, schema.RemoteAgent{
+			Name: agent.Name,
+			UUID: agent.UUID,
+		})
+	}
+	seb.Emails.Recipients = make([]schema.Recipient, len(eb.Emails.Recipients))
+	for i, recipient := range eb.Emails.Recipients {
+		seb.Emails.Recipients[i] = schema.Recipient{
+			Id:    recipient.Id,
+			Name:  recipient.Name,
+			Email: recipient.Email,
+		}
+	}
+	seb.ParentEnvironmentId = eb.ParentEnvironmentId
+	seb.ClientCertificate = eb.ClientCertificate
 }
 
 type Environment struct {
@@ -60,6 +99,7 @@ func EnvironmentFromSchema(s *schema.Environment) *Environment {
 	env.InitialVariables = s.InitialVariables
 	env.Regions = s.Regions
 	env.RetryOnFailure = s.RetryOnFailure
+	env.StopOnFailure = s.StopOnFailure
 	env.VerifySSL = s.VerifySSL
 	env.Webhooks = s.Webhooks
 	env.Emails = Emails{
@@ -84,6 +124,8 @@ func EnvironmentFromSchema(s *schema.Environment) *Environment {
 			Email: r.Email,
 		})
 	}
+	env.ParentEnvironmentId = s.ParentEnvironmentId
+	env.ClientCertificate = s.ClientCertificate
 	return env
 }
 
@@ -96,7 +138,7 @@ func (opts *EnvironmentUriOpts) BaseURL() string {
 	if opts.TestId == "" {
 		return fmt.Sprintf("/buckets/%s/environments", opts.BucketId)
 	}
-	return fmt.Sprintf("/buckets/%s/test/%s/environments", opts.BucketId, opts.TestId)
+	return fmt.Sprintf("/buckets/%s/tests/%s/environments", opts.BucketId, opts.TestId)
 }
 
 type EnvironmentCreateOpts struct {
@@ -106,35 +148,7 @@ type EnvironmentCreateOpts struct {
 
 func (c *EnvironmentClient) Create(ctx context.Context, opts *EnvironmentCreateOpts) (*Environment, error) {
 	body := &schema.EnvironmentCreateRequest{}
-	body.Name = opts.Name
-	body.Script = opts.Script
-	body.PreserveCookies = opts.PreserveCookies
-	body.InitialVariables = opts.InitialVariables
-	body.Regions = opts.Regions
-	body.RetryOnFailure = opts.RetryOnFailure
-	body.VerifySSL = opts.VerifySSL
-	body.Webhooks = opts.Webhooks
-	body.Emails = schema.Emails{
-		NotifyAll:       opts.Emails.NotifyAll,
-		NotifyOn:        opts.Emails.NotifyOn,
-		NotifyThreshold: opts.Emails.NotifyThreshold,
-	}
-	for _, id := range opts.Integrations {
-		body.Integrations = append(body.Integrations, schema.EnvironmentIntegration{Id: id})
-	}
-	for _, agent := range opts.RemoteAgents {
-		body.RemoteAgents = append(body.RemoteAgents, schema.RemoteAgent{
-			Name: agent.Name,
-			UUID: agent.UUID,
-		})
-	}
-	for _, recipient := range opts.Emails.Recipients {
-		body.Emails.Recipients = append(body.Emails.Recipients, schema.Recipient{
-			Id:    recipient.Id,
-			Name:  recipient.Name,
-			Email: recipient.Email,
-		})
-	}
+	opts.EnvironmentBase.setRequest(&body.EnvironmentBase)
 
 	req, err := c.client.NewRequest(ctx, "POST", opts.BaseURL(), &body)
 	if err != nil {
@@ -181,35 +195,8 @@ type EnvironmentUpdateOpts struct {
 
 func (c *EnvironmentClient) Update(ctx context.Context, opts *EnvironmentUpdateOpts) (*Environment, error) {
 	body := &schema.EnvironmentUpdateRequest{}
-	body.Name = opts.Name
-	body.Script = opts.Script
-	body.PreserveCookies = opts.PreserveCookies
-	body.InitialVariables = opts.InitialVariables
-	body.Regions = opts.Regions
-	body.RetryOnFailure = opts.RetryOnFailure
-	body.VerifySSL = opts.VerifySSL
-	body.Webhooks = opts.Webhooks
-	body.Emails = schema.Emails{
-		NotifyAll:       opts.Emails.NotifyAll,
-		NotifyOn:        opts.Emails.NotifyOn,
-		NotifyThreshold: opts.Emails.NotifyThreshold,
-	}
-	for _, id := range opts.Integrations {
-		body.Integrations = append(body.Integrations, schema.EnvironmentIntegration{Id: id})
-	}
-	for _, agent := range opts.RemoteAgents {
-		body.RemoteAgents = append(body.RemoteAgents, schema.RemoteAgent{
-			Name: agent.Name,
-			UUID: agent.UUID,
-		})
-	}
-	for _, recipient := range opts.Emails.Recipients {
-		body.Emails.Recipients = append(body.Emails.Recipients, schema.Recipient{
-			Id:    recipient.Id,
-			Name:  recipient.Name,
-			Email: recipient.Email,
-		})
-	}
+	opts.EnvironmentBase.setRequest(&body.EnvironmentBase)
+
 	req, err := c.client.NewRequest(ctx, "PUT", opts.URL(), &body)
 	if err != nil {
 		return nil, err

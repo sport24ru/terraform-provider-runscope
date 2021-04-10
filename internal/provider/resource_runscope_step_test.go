@@ -11,7 +11,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-sdk/v2/terraform"
 )
 
-func TestAccStep_basic(t *testing.T) {
+func TestAccStep_create_default_step(t *testing.T) {
 	teamId := os.Getenv("RUNSCOPE_TEAM_ID")
 	bucketName := testAccRandomBucketName()
 	resource.Test(t, resource.TestCase{
@@ -20,14 +20,163 @@ func TestAccStep_basic(t *testing.T) {
 		CheckDestroy:      testAccCheckStepDestroy,
 		Steps: []resource.TestStep{
 			{
-				Config: fmt.Sprintf(testRunscopeStepConfigA, bucketName, teamId),
+				Config: fmt.Sprintf(testAccStepDefaultConfig, bucketName, teamId),
 				Check: resource.ComposeTestCheckFunc(
-					testAccCheckStepMainPageExists("runscope_step.main_page"),
-					resource.TestCheckResourceAttr(
-						"runscope_step.main_page", "url", "http://example.com"),
-					resource.TestCheckResourceAttr("runscope_step.main_page", "variable.#", "2"),
-					resource.TestCheckResourceAttr("runscope_step.main_page", "assertion.#", "2"),
-					resource.TestCheckResourceAttr("runscope_step.main_page", "header.#", "3"),
+					testAccCheckStepExists("runscope_step.step"),
+					resource.TestCheckResourceAttr("runscope_step.step", "step_type", "request"),
+					resource.TestCheckResourceAttr("runscope_step.step", "skipped", "false"),
+					resource.TestCheckResourceAttr("runscope_step.step", "note", ""),
+					resource.TestCheckResourceAttr("runscope_step.step", "method", "GET"),
+					resource.TestCheckResourceAttr("runscope_step.step", "body", ""),
+					resource.TestCheckResourceAttr("runscope_step.step", "form_parameter.#", "0"),
+					resource.TestCheckResourceAttr("runscope_step.step", "header.#", "0"),
+					resource.TestCheckResourceAttr("runscope_step.step", "url", "https://example.org"),
+					resource.TestCheckResourceAttr("runscope_step.step", "auth.#", "0"),
+					resource.TestCheckResourceAttr("runscope_step.step", "assertion.#", "0"),
+					resource.TestCheckResourceAttr("runscope_step.step", "variable.#", "0"),
+					resource.TestCheckResourceAttr("runscope_step.step", "scripts.#", "0"),
+					resource.TestCheckResourceAttr("runscope_step.step", "before_scripts.#", "0"),
+				),
+			},
+		},
+	})
+}
+
+func TestAccStep_create_custom_step(t *testing.T) {
+	teamId := os.Getenv("RUNSCOPE_TEAM_ID")
+	bucketName := testAccRandomBucketName()
+	resource.Test(t, resource.TestCase{
+		PreCheck:          func() { testAccPreCheck(t) },
+		ProviderFactories: testAccProviderFactories,
+		CheckDestroy:      testAccCheckStepDestroy,
+		Steps: []resource.TestStep{
+			{
+				Config: fmt.Sprintf(testAccStepCustomConfig, bucketName, teamId),
+				Check: resource.ComposeTestCheckFunc(
+					testAccCheckStepExists("runscope_step.step"),
+					resource.TestCheckResourceAttr("runscope_step.step", "step_type", "request"),
+					resource.TestCheckResourceAttr("runscope_step.step", "skipped", "true"),
+					resource.TestCheckResourceAttr("runscope_step.step", "note", "Step note"),
+					resource.TestCheckResourceAttr("runscope_step.step", "method", "POST"),
+					resource.TestCheckResourceAttr("runscope_step.step", "url", "https://example.org"),
+					resource.TestCheckResourceAttr("runscope_step.step", "body", "Request body"),
+					resource.TestCheckResourceAttr("runscope_step.step", "form_parameter.#", "3"),
+					resource.TestCheckResourceAttr("runscope_step.step", "form_parameter.0.name", "a"),
+					resource.TestCheckResourceAttr("runscope_step.step", "form_parameter.0.value", "1"),
+					resource.TestCheckResourceAttr("runscope_step.step", "form_parameter.1.name", "a"),
+					resource.TestCheckResourceAttr("runscope_step.step", "form_parameter.1.value", "2"),
+					resource.TestCheckResourceAttr("runscope_step.step", "form_parameter.2.name", "b"),
+					resource.TestCheckResourceAttr("runscope_step.step", "form_parameter.2.value", "3"),
+					resource.TestCheckResourceAttr("runscope_step.step", "header.#", "3"),
+					resource.TestCheckResourceAttr("runscope_step.step", "header.0.header", "Accept-Encoding"),
+					resource.TestCheckResourceAttr("runscope_step.step", "header.0.value", "application/json"),
+					resource.TestCheckResourceAttr("runscope_step.step", "header.1.header", "Accept-Encoding"),
+					resource.TestCheckResourceAttr("runscope_step.step", "header.1.value", "application/xml"),
+					resource.TestCheckResourceAttr("runscope_step.step", "header.2.header", "Authorization"),
+					resource.TestCheckResourceAttr("runscope_step.step", "header.2.value", "Bearer bb74fe7b-b9f2-48bd-9445-bdc60e1edc6a"),
+					resource.TestCheckResourceAttr("runscope_step.step", "auth.#", "1"),
+					resource.TestCheckResourceAttr("runscope_step.step", "auth.0.username", "user"),
+					resource.TestCheckResourceAttr("runscope_step.step", "auth.0.auth_type", "basic"),
+					resource.TestCheckResourceAttr("runscope_step.step", "auth.0.password", "password1"),
+					resource.TestCheckResourceAttr("runscope_step.step", "assertion.#", "2"),
+					resource.TestCheckResourceAttr("runscope_step.step", "assertion.0.source", "response_status"),
+					resource.TestCheckResourceAttr("runscope_step.step", "assertion.0.comparison", "equal_number"),
+					resource.TestCheckResourceAttr("runscope_step.step", "assertion.0.value", "200"),
+					resource.TestCheckResourceAttr("runscope_step.step", "assertion.1.source", "response_json"),
+					resource.TestCheckResourceAttr("runscope_step.step", "assertion.1.comparison", "equal"),
+					resource.TestCheckResourceAttr("runscope_step.step", "assertion.1.value", "c5baeb4a-2379-478a-9cda-1b671de77cf9"),
+					resource.TestCheckResourceAttr("runscope_step.step", "assertion.1.property", "data.id"),
+					resource.TestCheckResourceAttr("runscope_step.step", "variable.#", "2"),
+					resource.TestCheckResourceAttr("runscope_step.step", "variable.0.name", "httpContentEncoding"),
+					resource.TestCheckResourceAttr("runscope_step.step", "variable.0.source", "response_header"),
+					resource.TestCheckResourceAttr("runscope_step.step", "variable.0.property", "Content-Encoding"),
+					resource.TestCheckResourceAttr("runscope_step.step", "variable.1.name", "httpStatus"),
+					resource.TestCheckResourceAttr("runscope_step.step", "variable.1.source", "response_status"),
+					resource.TestCheckResourceAttr("runscope_step.step", "scripts.#", "2"),
+					resource.TestCheckResourceAttr("runscope_step.step", "scripts.0", "log(\"script 1\");"),
+					resource.TestCheckResourceAttr("runscope_step.step", "scripts.1", "log(\"script 2\");"),
+					resource.TestCheckResourceAttr("runscope_step.step", "before_scripts.#", "1"),
+					resource.TestCheckResourceAttr("runscope_step.step", "before_scripts.0", "log(\"before script\");"),
+				),
+			},
+		},
+	})
+}
+
+func TestAccStep_update_step(t *testing.T) {
+	teamId := os.Getenv("RUNSCOPE_TEAM_ID")
+	bucketName := testAccRandomBucketName()
+	resource.Test(t, resource.TestCase{
+		PreCheck:          func() { testAccPreCheck(t) },
+		ProviderFactories: testAccProviderFactories,
+		CheckDestroy:      testAccCheckStepDestroy,
+		Steps: []resource.TestStep{
+			{
+				Config: fmt.Sprintf(testAccStepDefaultConfig, bucketName, teamId),
+				Check: resource.ComposeTestCheckFunc(
+					testAccCheckStepExists("runscope_step.step"),
+					resource.TestCheckResourceAttr("runscope_step.step", "step_type", "request"),
+					resource.TestCheckResourceAttr("runscope_step.step", "skipped", "false"),
+					resource.TestCheckResourceAttr("runscope_step.step", "note", ""),
+					resource.TestCheckResourceAttr("runscope_step.step", "method", "GET"),
+					resource.TestCheckResourceAttr("runscope_step.step", "body", ""),
+					resource.TestCheckResourceAttr("runscope_step.step", "form_parameter.#", "0"),
+					resource.TestCheckResourceAttr("runscope_step.step", "header.#", "0"),
+					resource.TestCheckResourceAttr("runscope_step.step", "url", "https://example.org"),
+					resource.TestCheckResourceAttr("runscope_step.step", "auth.#", "0"),
+					resource.TestCheckResourceAttr("runscope_step.step", "assertion.#", "0"),
+					resource.TestCheckResourceAttr("runscope_step.step", "variable.#", "0"),
+					resource.TestCheckResourceAttr("runscope_step.step", "scripts.#", "0"),
+					resource.TestCheckResourceAttr("runscope_step.step", "before_scripts.#", "0"),
+				),
+			},
+			{
+				Config: fmt.Sprintf(testAccStepCustomConfig, bucketName, teamId),
+				Check: resource.ComposeTestCheckFunc(
+					testAccCheckStepExists("runscope_step.step"),
+					resource.TestCheckResourceAttr("runscope_step.step", "step_type", "request"),
+					resource.TestCheckResourceAttr("runscope_step.step", "skipped", "true"),
+					resource.TestCheckResourceAttr("runscope_step.step", "note", "Step note"),
+					resource.TestCheckResourceAttr("runscope_step.step", "method", "POST"),
+					resource.TestCheckResourceAttr("runscope_step.step", "url", "https://example.org"),
+					resource.TestCheckResourceAttr("runscope_step.step", "body", "Request body"),
+					resource.TestCheckResourceAttr("runscope_step.step", "form_parameter.#", "3"),
+					resource.TestCheckResourceAttr("runscope_step.step", "form_parameter.0.name", "a"),
+					resource.TestCheckResourceAttr("runscope_step.step", "form_parameter.0.value", "1"),
+					resource.TestCheckResourceAttr("runscope_step.step", "form_parameter.1.name", "a"),
+					resource.TestCheckResourceAttr("runscope_step.step", "form_parameter.1.value", "2"),
+					resource.TestCheckResourceAttr("runscope_step.step", "form_parameter.2.name", "b"),
+					resource.TestCheckResourceAttr("runscope_step.step", "form_parameter.2.value", "3"),
+					resource.TestCheckResourceAttr("runscope_step.step", "header.#", "3"),
+					resource.TestCheckResourceAttr("runscope_step.step", "header.0.header", "Accept-Encoding"),
+					resource.TestCheckResourceAttr("runscope_step.step", "header.0.value", "application/json"),
+					resource.TestCheckResourceAttr("runscope_step.step", "header.1.header", "Accept-Encoding"),
+					resource.TestCheckResourceAttr("runscope_step.step", "header.1.value", "application/xml"),
+					resource.TestCheckResourceAttr("runscope_step.step", "header.2.header", "Authorization"),
+					resource.TestCheckResourceAttr("runscope_step.step", "header.2.value", "Bearer bb74fe7b-b9f2-48bd-9445-bdc60e1edc6a"),
+					resource.TestCheckResourceAttr("runscope_step.step", "auth.#", "1"),
+					resource.TestCheckResourceAttr("runscope_step.step", "auth.0.username", "user"),
+					resource.TestCheckResourceAttr("runscope_step.step", "auth.0.auth_type", "basic"),
+					resource.TestCheckResourceAttr("runscope_step.step", "auth.0.password", "password1"),
+					resource.TestCheckResourceAttr("runscope_step.step", "assertion.#", "2"),
+					resource.TestCheckResourceAttr("runscope_step.step", "assertion.0.source", "response_status"),
+					resource.TestCheckResourceAttr("runscope_step.step", "assertion.0.comparison", "equal_number"),
+					resource.TestCheckResourceAttr("runscope_step.step", "assertion.0.value", "200"),
+					resource.TestCheckResourceAttr("runscope_step.step", "assertion.1.source", "response_json"),
+					resource.TestCheckResourceAttr("runscope_step.step", "assertion.1.comparison", "equal"),
+					resource.TestCheckResourceAttr("runscope_step.step", "assertion.1.value", "c5baeb4a-2379-478a-9cda-1b671de77cf9"),
+					resource.TestCheckResourceAttr("runscope_step.step", "assertion.1.property", "data.id"),
+					resource.TestCheckResourceAttr("runscope_step.step", "variable.#", "2"),
+					resource.TestCheckResourceAttr("runscope_step.step", "variable.0.name", "httpContentEncoding"),
+					resource.TestCheckResourceAttr("runscope_step.step", "variable.0.source", "response_header"),
+					resource.TestCheckResourceAttr("runscope_step.step", "variable.0.property", "Content-Encoding"),
+					resource.TestCheckResourceAttr("runscope_step.step", "variable.1.name", "httpStatus"),
+					resource.TestCheckResourceAttr("runscope_step.step", "variable.1.source", "response_status"),
+					resource.TestCheckResourceAttr("runscope_step.step", "scripts.#", "2"),
+					resource.TestCheckResourceAttr("runscope_step.step", "scripts.0", "log(\"script 1\");"),
+					resource.TestCheckResourceAttr("runscope_step.step", "scripts.1", "log(\"script 2\");"),
+					resource.TestCheckResourceAttr("runscope_step.step", "before_scripts.#", "1"),
+					resource.TestCheckResourceAttr("runscope_step.step", "before_scripts.0", "log(\"before script\");"),
 				),
 			},
 		},
@@ -101,98 +250,6 @@ func testAccCheckStepDestroy(s *terraform.State) error {
 	}
 
 	return nil
-}
-
-func testAccCheckStepMainPageExists(n string) resource.TestCheckFunc {
-	return func(s *terraform.State) error {
-		ctx := context.Background()
-
-		rs, ok := s.RootModule().Resources[n]
-
-		if !ok {
-			return fmt.Errorf("Not found: %s", n)
-		}
-
-		if rs.Primary.ID == "" {
-			return fmt.Errorf("No Record ID is set")
-		}
-
-		client := testAccProvider.Meta().(*providerConfig).client
-
-		opts := &runscope.StepGetOpts{}
-		opts.Id = rs.Primary.ID
-		opts.TestId = rs.Primary.Attributes["test_id"]
-		opts.BucketId = rs.Primary.Attributes["bucket_id"]
-
-		step, err := client.Step.Get(ctx, opts)
-		if err != nil {
-			return err
-		}
-
-		if step.Id != rs.Primary.ID {
-			return fmt.Errorf("Record not found")
-		}
-
-		if len(step.Variables) != 2 {
-			return fmt.Errorf("Expected %d variables, actual %d", 2, len(step.Variables))
-		}
-
-		variable := step.Variables[1]
-		if variable.Name != "httpContentEncoding" {
-			return fmt.Errorf("Expected %s variables, actual %s", "httpContentEncoding", variable.Name)
-		}
-
-		if len(step.Assertions) != 2 {
-			return fmt.Errorf("Expected %d assertions, actual %d", 2, len(step.Assertions))
-		}
-
-		assertion := step.Assertions[1]
-		if assertion.Source != "response_json" {
-			return fmt.Errorf("Expected assertion source %s, actual %s",
-				"response_json", assertion.Source)
-		}
-
-		if len(step.Headers) != 2 {
-			return fmt.Errorf("Expected %d headers, actual %d", 1, len(step.Headers))
-		}
-
-		if header, ok := step.Headers["Accept-Encoding"]; ok {
-			if len(header) != 2 {
-				return fmt.Errorf("Expected %d values for header %s, actual %d",
-					2, "Accept-Encoding", len(header))
-
-			}
-
-			if header[1] != "application/xml" {
-				return fmt.Errorf("Expected header value %s, actual %s",
-					"application/xml", header[1])
-			}
-		} else {
-			return fmt.Errorf("Expected header %s to exist", "Accept-Encoding")
-		}
-
-		if len(step.Scripts) != 2 {
-			return fmt.Errorf("Expected %d scripts, actual %d", 2, len(step.Scripts))
-		}
-
-		if step.Scripts[1] != "log(\"script 2\");" {
-			return fmt.Errorf("Expected %s, actual %s", "log(\"script 2\");", step.Scripts[1])
-		}
-
-		if len(step.BeforeScripts) != 1 {
-			return fmt.Errorf("Expected %d scripts, actual %d", 1, len(step.BeforeScripts))
-		}
-
-		if step.BeforeScripts[0] != "log(\"before script\");" {
-			return fmt.Errorf("Expected %s, actual %s", "log(\"before script\");", step.BeforeScripts[0])
-		}
-
-		if step.Note != "Testing step, single step test" {
-			return fmt.Errorf("Expected note %s, actual note %s", "Testing step, single step test", step.Note)
-		}
-
-		return nil
-	}
 }
 
 func testAccCheckStepExists(n string) resource.TestCheckFunc {
@@ -281,74 +338,122 @@ func testAccCheckStepOrder(n, s1, s2 string) resource.TestCheckFunc {
 	}
 }
 
-const testRunscopeStepConfigA = `
+const testAccStepDefaultConfig = `
 resource "runscope_bucket" "bucket" {
   name      = "%s"
   team_uuid = "%s"
 }
 
 resource "runscope_test" "test" {
-  bucket_id   = "${runscope_bucket.bucket.id}"
+  bucket_id   = runscope_bucket.bucket.id
   name        = "runscope test"
   description = "This is a test test..."
 }
 
-resource "runscope_step" "main_page" {
-  bucket_id      = runscope_bucket.bucket.id
-  test_id        = runscope_test.test.id
-  step_type      = "request"
-  note           = "Testing step, single step test"
-  url            = "http://example.com"
-  method         = "GET"
+resource "runscope_step" "step" {
+  bucket_id = runscope_bucket.bucket.id
+  test_id   = runscope_test.test.id
+
+  step_type = "request"
+  method    = "GET"
+  url       = "https://example.org"
+}
+`
+
+const testAccStepCustomConfig = `
+resource "runscope_bucket" "bucket" {
+  name      = "%s"
+  team_uuid = "%s"
+}
+
+resource "runscope_test" "test" {
+  bucket_id   = runscope_bucket.bucket.id
+  name        = "runscope test"
+  description = "This is a test test..."
+}
+
+resource "runscope_step" "step" {
+  bucket_id = runscope_bucket.bucket.id
+  test_id   = runscope_test.test.id
+
+  step_type = "request"
+  method    = "POST"
+  url       = "https://example.org"
+
   variable {
-  	   name     = "httpStatus"
-  	   source   = "response_status"
-  	}
-  	variable {
-  	   name     = "httpContentEncoding"
-  	   source   = "response_header"
-  	   property = "Content-Encoding"
-  	}
-
-  assertion {
-  	   source     = "response_status"
-           comparison = "equal_number"
-           value      = "200"
-  	}
-  	assertion {
-  	   source     = "response_json"
-           comparison = "equal"
-           value      = "c5baeb4a-2379-478a-9cda-1b671de77cf9"
-           property   = "data.id"
-  	}
-
-  header 	{
-  		header = "Accept-Encoding"
-  		value  = "application/json"
-  	}
-  	header {
-  		header = "Accept-Encoding"
-  		value  = "application/xml"
-  	}
-  	header {
-  		header = "Authorization"
-  		value  = "Bearer bb74fe7b-b9f2-48bd-9445-bdc60e1edc6a"
-	}
-
-
-  auth {
-	username  = "user"
-	auth_type = "basic"
-	password  = "password1"
+    name     = "httpStatus"
+    source   = "response_status"
   }
 
+  variable {
+    name     = "httpContentEncoding"
+    source   = "response_header"
+    property = "Content-Encoding"
+  }
+
+  assertion {
+    source     = "response_status"
+    comparison = "equal_number"
+    value      = "200"
+  }
+
+  assertion {
+    source     = "response_json"
+    comparison = "equal"
+    value      = "c5baeb4a-2379-478a-9cda-1b671de77cf9"
+    property   = "data.id"
+  }
+  
+  header {
+    header = "Accept-Encoding"
+    value  = "application/json"
+  }
+
+  header {
+    header = "Accept-Encoding"
+    value  = "application/xml"
+  }
+
+  header {
+    header = "Authorization"
+    value  = "Bearer bb74fe7b-b9f2-48bd-9445-bdc60e1edc6a"
+  }
+  
+  auth {
+    username  = "user"
+    auth_type = "basic"
+    password  = "password1"
+  }
+  
   scripts = [
     "log(\"script 1\");",
     "log(\"script 2\");",
   ]
+
   before_scripts = [
     "log(\"before script\");",
   ]
+
+  skipped = true
+
+  note = "Step note"
+
+  body = "Request body"
+
+  form_parameter {
+    name = "a"
+    value = "1"
+  }
+
+  form_parameter {
+    name = "a"
+    value = "2"
+  }
+
+  form_parameter {
+    name = "b"
+    value = "3"
+  }
 }
 `
 

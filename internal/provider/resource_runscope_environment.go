@@ -29,23 +29,19 @@ func resourceRunscopeEnvironment() *schema.Resource {
 			"name": {
 				Type:     schema.TypeString,
 				Required: true,
-				ForceNew: false,
 			},
 			"script": {
 				Type:     schema.TypeString,
 				Optional: true,
-				ForceNew: false,
 			},
 			"preserve_cookies": {
 				Type:     schema.TypeBool,
 				Optional: true,
-				ForceNew: false,
 			},
 			"initial_variables": {
 				Type:     schema.TypeMap,
 				Elem:     &schema.Schema{Type: schema.TypeString},
 				Optional: true,
-				ForceNew: false,
 			},
 			"integrations": {
 				Type:     schema.TypeSet,
@@ -74,6 +70,10 @@ func resourceRunscopeEnvironment() *schema.Resource {
 				Optional: true,
 			},
 			"retry_on_failure": {
+				Type:     schema.TypeBool,
+				Optional: true,
+			},
+			"stop_on_failure": {
 				Type:     schema.TypeBool,
 				Optional: true,
 			},
@@ -135,12 +135,24 @@ func resourceRunscopeEnvironment() *schema.Resource {
 				},
 				Optional: true,
 			},
+			"parent_environment_id": {
+				Type:     schema.TypeString,
+				Optional: true,
+			},
+			"client_certificate": {
+				Type:     schema.TypeString,
+				Optional: true,
+			},
 		},
 	}
 }
 
 func resourceEnvironmentCreate(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
 	client := meta.(*providerConfig).client
+
+	if err := validateEnvironmentSchema(d); err != nil {
+		return err
+	}
 
 	opts := runscope.EnvironmentCreateOpts{}
 	expandEnvironmentUriOpts(d, &opts.EnvironmentUriOpts)
@@ -183,17 +195,24 @@ func resourceEnvironmentRead(ctx context.Context, d *schema.ResourceData, meta i
 	d.Set("initial_variables", env.InitialVariables)
 	d.Set("integrations", env.Integrations)
 	d.Set("retry_on_failure", env.RetryOnFailure)
+	d.Set("stop_on_failure", env.StopOnFailure)
 	d.Set("verify_ssl", env.VerifySSL)
 	d.Set("webhooks", env.Webhooks)
 	if !env.Emails.IsDefault() {
 		d.Set("email", flattenEmails(env.Emails))
 	}
+	d.Set("parent_environment_id", env.ParentEnvironmentId)
+	d.Set("client_certificate", env.ClientCertificate)
 
 	return nil
 }
 
 func resourceEnvironmentUpdate(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
 	client := meta.(*providerConfig).client
+
+	if err := validateEnvironmentSchema(d); err != nil {
+		return err
+	}
 
 	opts := runscope.EnvironmentUpdateOpts{}
 	expandEnvironmentGetOpts(d, &opts.EnvironmentGetOpts)
@@ -294,6 +313,9 @@ func expandEnvironmentBase(d *schema.ResourceData, opts *runscope.EnvironmentBas
 	if v, ok := d.GetOk("retry_on_failure"); ok {
 		opts.RetryOnFailure = v.(bool)
 	}
+	if v, ok := d.GetOk("stop_on_failure"); ok {
+		opts.StopOnFailure = v.(bool)
+	}
 	if v, ok := d.GetOk("webhooks"); ok {
 		for _, w := range v.(*schema.Set).List() {
 			opts.Webhooks = append(opts.Webhooks, w.(string))
@@ -306,14 +328,33 @@ func expandEnvironmentBase(d *schema.ResourceData, opts *runscope.EnvironmentBas
 			opts.Emails.NotifyOn = ee["notify_on"].(string)
 			opts.Emails.NotifyAll = ee["notify_all"].(bool)
 			opts.Emails.NotifyThreshold = ee["notify_threshold"].(int)
-			for _, re := range ee["recipient"].(*schema.Set).List() {
-				rec := re.(map[string]interface{})
-				opts.Emails.Recipients = append(opts.Emails.Recipients, runscope.Recipient{
-					Id:    rec["id"].(string),
-					Name:  rec["name"].(string),
-					Email: rec["email"].(string),
-				})
+			recipients := ee["recipient"].(*schema.Set).List()
+			if len(recipients) > 0 {
+				opts.Emails.Recipients = make([]runscope.Recipient, len(recipients))
+				for i, recipient := range recipients {
+					r := recipient.(map[string]interface{})
+					opts.Emails.Recipients[i].Id = r["id"].(string)
+					opts.Emails.Recipients[i].Name = r["name"].(string)
+					opts.Emails.Recipients[i].Email = r["email"].(string)
+				}
 			}
 		}
 	}
+	if v, ok := d.GetOk("parent_environment_id"); ok {
+		opts.ParentEnvironmentId = v.(string)
+	}
+	if v, ok := d.GetOk("client_certificate"); ok {
+		opts.ClientCertificate = v.(string)
+	}
+}
+
+func validateEnvironmentSchema(d *schema.ResourceData) diag.Diagnostics {
+	if _, hasTestId := d.GetOk("test_id"); hasTestId {
+		return nil
+	}
+	if _, hasParentEnvironmentId := d.GetOk("parent_environment_id"); !hasParentEnvironmentId {
+		return nil
+	}
+
+	return diag.Errorf("parent_environment_id could be set only if test_id defined")
 }

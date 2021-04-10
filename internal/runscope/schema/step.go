@@ -9,9 +9,11 @@ type StepBase struct {
 	Headers       map[string][]string `json:"headers"`
 	Auth          StepAuth            `json:"auth"`
 	Body          string              `json:"body"`
+	Form          map[string][]string `json:"form"`
 	Scripts       []string            `json:"scripts"`
 	BeforeScripts []string            `json:"before_scripts"`
 	Note          string              `json:"note"`
+	Skipped       bool                `json:"skipped"`
 }
 
 type Step struct {
@@ -55,5 +57,5 @@ type StepUpdateRequest struct {
 }
 
 type StepUpdateResponse struct {
-	Step []Step `json:"data"`
+	Step Step `json:"data"`
 }
