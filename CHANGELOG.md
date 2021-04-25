@@ -1,3 +1,11 @@
+## 0.11.0 (Unreleased)
+
+* Validate enumerated attributes
+  * runscope_schedule.interval
+  * runscope_step.variable.source
+  * runscope_step.assertion.source
+  * runscope_step.assertion.comparison
+  
 ## 0.10.0 (April 24, 2021)
 
 ENHANCEMENTS:

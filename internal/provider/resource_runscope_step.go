@@ -4,12 +4,32 @@ import (
 	"context"
 	"fmt"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 	"github.com/terraform-providers/terraform-provider-runscope/internal/runscope"
 	"strconv"
 	"strings"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
+
+var stepSources = []string{"response_status", "response_headers", "response_json", "response_xml", "response_text", "response_time", "response_size"}
+var stepComparisons = []string{
+	"equal",
+	"empty",
+	"not_empty",
+	"not_equal",
+	"contains",
+	"does_not_contain",
+	"is_a_number",
+	"equal_number",
+	"is_less_than",
+	"is_less_than_or_equal",
+	"is_greater_than",
+	"is_greater_than_or_equal",
+	"has_key",
+	"has_value",
+	"is_null",
+}
 
 func resourceRunscopeStep() *schema.Resource {
 	return &schema.Resource{
@@ -108,8 +128,9 @@ func resourceRunscopeStep() *schema.Resource {
 							Optional: true,
 						},
 						"source": {
-							Type:     schema.TypeString,
-							Required: true,
+							Type:         schema.TypeString,
+							Required:     true,
+							ValidateFunc: validation.StringInSlice(stepSources, false),
 						},
 					},
 				},
@@ -120,16 +141,18 @@ func resourceRunscopeStep() *schema.Resource {
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
 						"source": {
-							Type:     schema.TypeString,
-							Required: true,
+							Type:         schema.TypeString,
+							Required:     true,
+							ValidateFunc: validation.StringInSlice(stepSources, false),
 						},
 						"property": {
 							Type:     schema.TypeString,
 							Optional: true,
 						},
 						"comparison": {
-							Type:     schema.TypeString,
-							Required: true,
+							Type:         schema.TypeString,
+							Required:     true,
+							ValidateFunc: validation.StringInSlice(stepComparisons, false),
 						},
 						"value": {
 							Type:     schema.TypeString,

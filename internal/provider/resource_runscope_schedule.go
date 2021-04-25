@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 	"github.com/terraform-providers/terraform-provider-runscope/internal/runscope"
 	"strings"
 
@@ -32,8 +33,9 @@ func resourceRunscopeSchedule() *schema.Resource {
 				Required: true,
 			},
 			"interval": {
-				Type:     schema.TypeString,
-				Required: true,
+				Type:         schema.TypeString,
+				Required:     true,
+				ValidateFunc: validation.StringInSlice([]string{"1m", "5m", "15m", "30m", "1h", "6h", "1d"}, false),
 			},
 			"note": {
 				Type:     schema.TypeString,

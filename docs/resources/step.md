@@ -112,13 +112,13 @@ Variable (`variable`) supports the following:
 
 * `name` - (Required) Name of the variable to define.
 * `property` - (Required) The name of the source property. i.e. header name or json path
-* `source` - (Required) The variable source, for list of allowed values see: https://www.runscope.com/docs/api/steps#assertions
+* `source` - (Required) The variable source, for list of allowed values see: https://api.blazemeter.com/api-monitoring/#variable-sources-list
 
 Assertion (`assertion`) supports the following:
 
-* `source` - (Required) The assertion source, for list of allowed values see: https://www.runscope.com/docs/api/steps#assertions
+* `source` - (Required) The assertion source, for list of allowed values see: https://api.blazemeter.com/api-monitoring/#assertion-sources-list
 * `property` - (Optional) The name of the source property. i.e. header name or json path
-* `comparison` - (Required) The assertion comparison to make i.e. `equals`, for list of allowed values see: https://www.runscope.com/docs/api/steps#assertions
+* `comparison` - (Required) The assertion comparison to make i.e. `equals`, for list of allowed values see: https://api.blazemeter.com/api-monitoring/#assertion-comparisons-list
 * `value` - (Optional) The value the `comparison` will use
 
 **Example Assertion**

@@ -5,13 +5,14 @@ import (
 	"fmt"
 	"github.com/terraform-providers/terraform-provider-runscope/internal/runscope"
 	"os"
+	"regexp"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/terraform"
 )
 
-func TestAccStep_create_default_step(t *testing.T) {
+func TestAccStep_create_default(t *testing.T) {
 	teamId := os.Getenv("RUNSCOPE_TEAM_ID")
 	bucketName := testAccRandomBucketName()
 	resource.Test(t, resource.TestCase{
@@ -42,7 +43,7 @@ func TestAccStep_create_default_step(t *testing.T) {
 	})
 }
 
-func TestAccStep_create_custom_step(t *testing.T) {
+func TestAccStep_create_custom(t *testing.T) {
 	teamId := os.Getenv("RUNSCOPE_TEAM_ID")
 	bucketName := testAccRandomBucketName()
 	resource.Test(t, resource.TestCase{
@@ -88,7 +89,7 @@ func TestAccStep_create_custom_step(t *testing.T) {
 					resource.TestCheckResourceAttr("runscope_step.step", "assertion.1.property", "data.id"),
 					resource.TestCheckResourceAttr("runscope_step.step", "variable.#", "2"),
 					resource.TestCheckResourceAttr("runscope_step.step", "variable.0.name", "httpContentEncoding"),
-					resource.TestCheckResourceAttr("runscope_step.step", "variable.0.source", "response_header"),
+					resource.TestCheckResourceAttr("runscope_step.step", "variable.0.source", "response_headers"),
 					resource.TestCheckResourceAttr("runscope_step.step", "variable.0.property", "Content-Encoding"),
 					resource.TestCheckResourceAttr("runscope_step.step", "variable.1.name", "httpStatus"),
 					resource.TestCheckResourceAttr("runscope_step.step", "variable.1.source", "response_status"),
@@ -103,7 +104,7 @@ func TestAccStep_create_custom_step(t *testing.T) {
 	})
 }
 
-func TestAccStep_update_step(t *testing.T) {
+func TestAccStep_update(t *testing.T) {
 	teamId := os.Getenv("RUNSCOPE_TEAM_ID")
 	bucketName := testAccRandomBucketName()
 	resource.Test(t, resource.TestCase{
@@ -168,7 +169,7 @@ func TestAccStep_update_step(t *testing.T) {
 					resource.TestCheckResourceAttr("runscope_step.step", "assertion.1.property", "data.id"),
 					resource.TestCheckResourceAttr("runscope_step.step", "variable.#", "2"),
 					resource.TestCheckResourceAttr("runscope_step.step", "variable.0.name", "httpContentEncoding"),
-					resource.TestCheckResourceAttr("runscope_step.step", "variable.0.source", "response_header"),
+					resource.TestCheckResourceAttr("runscope_step.step", "variable.0.source", "response_headers"),
 					resource.TestCheckResourceAttr("runscope_step.step", "variable.0.property", "Content-Encoding"),
 					resource.TestCheckResourceAttr("runscope_step.step", "variable.1.name", "httpStatus"),
 					resource.TestCheckResourceAttr("runscope_step.step", "variable.1.source", "response_status"),
@@ -183,7 +184,7 @@ func TestAccStep_update_step(t *testing.T) {
 	})
 }
 
-func TestAccStep_multiple_steps(t *testing.T) {
+func TestAccStep_multiple(t *testing.T) {
 	teamID := os.Getenv("RUNSCOPE_TEAM_ID")
 	bucketName := testAccRandomBucketName()
 
@@ -225,6 +226,114 @@ func TestAccStep_multiple_steps(t *testing.T) {
 					}
 					return fmt.Sprintf("%s/%s#%d", rs.Primary.Attributes["bucket_id"], rs.Primary.Attributes["test_id"], 2), nil
 				},
+			},
+		},
+	})
+}
+
+func TestAccStep_valid_variable_source(t *testing.T) {
+	teamId := os.Getenv("RUNSCOPE_TEAM_ID")
+	bucketName := testAccRandomBucketName()
+	resource.Test(t, resource.TestCase{
+		PreCheck:          func() { testAccPreCheck(t) },
+		ProviderFactories: testAccProviderFactories,
+		CheckDestroy:      testAccCheckStepDestroy,
+		Steps: func() []resource.TestStep {
+			steps := make([]resource.TestStep, len(stepSources))
+			for i, source := range stepSources {
+				steps[i].Config = fmt.Sprintf(testAccStepVariableSourcesConfig, bucketName, teamId, source)
+				steps[i].Check = resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr("runscope_step.step", "variable.0.source", source),
+				)
+			}
+			return steps
+		}(),
+	})
+}
+
+func TestAccStep_invalid_variable_source(t *testing.T) {
+	teamId := os.Getenv("RUNSCOPE_TEAM_ID")
+	bucketName := testAccRandomBucketName()
+	resource.Test(t, resource.TestCase{
+		PreCheck:          func() { testAccPreCheck(t) },
+		ProviderFactories: testAccProviderFactories,
+		CheckDestroy:      testAccCheckStepDestroy,
+		Steps: []resource.TestStep{
+			{
+				Config:      fmt.Sprintf(testAccStepVariableSourcesConfig, bucketName, teamId, "invalid_source"),
+				ExpectError: regexp.MustCompile("expected variable.0.source to be one of"),
+			},
+		},
+	})
+}
+
+func TestAccStep_valid_assertion_source(t *testing.T) {
+	teamId := os.Getenv("RUNSCOPE_TEAM_ID")
+	bucketName := testAccRandomBucketName()
+	resource.Test(t, resource.TestCase{
+		PreCheck:          func() { testAccPreCheck(t) },
+		ProviderFactories: testAccProviderFactories,
+		CheckDestroy:      testAccCheckStepDestroy,
+		Steps: func() []resource.TestStep {
+			steps := make([]resource.TestStep, len(stepSources))
+			for i, source := range stepSources {
+				steps[i].Config = fmt.Sprintf(testAccStepAssertionSourcesConfig, bucketName, teamId, source)
+				steps[i].Check = resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr("runscope_step.step", "assertion.0.source", source),
+				)
+			}
+			return steps
+		}(),
+	})
+}
+
+func TestAccStep_invalid_assertion_source(t *testing.T) {
+	teamId := os.Getenv("RUNSCOPE_TEAM_ID")
+	bucketName := testAccRandomBucketName()
+	resource.Test(t, resource.TestCase{
+		PreCheck:          func() { testAccPreCheck(t) },
+		ProviderFactories: testAccProviderFactories,
+		CheckDestroy:      testAccCheckStepDestroy,
+		Steps: []resource.TestStep{
+			{
+				Config:      fmt.Sprintf(testAccStepAssertionSourcesConfig, bucketName, teamId, "invalid_source"),
+				ExpectError: regexp.MustCompile("expected assertion.0.source to be one of"),
+			},
+		},
+	})
+}
+
+func TestAccStep_valid_assertion_comparison(t *testing.T) {
+	teamId := os.Getenv("RUNSCOPE_TEAM_ID")
+	bucketName := testAccRandomBucketName()
+	resource.Test(t, resource.TestCase{
+		PreCheck:          func() { testAccPreCheck(t) },
+		ProviderFactories: testAccProviderFactories,
+		CheckDestroy:      testAccCheckStepDestroy,
+		Steps: func() []resource.TestStep {
+			steps := make([]resource.TestStep, len(stepComparisons))
+			for i, source := range stepComparisons {
+				steps[i].Config = fmt.Sprintf(testAccStepAssertionComparisonsConfig, bucketName, teamId, source)
+				steps[i].Check = resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr("runscope_step.step", "assertion.0.comparison", source),
+				)
+			}
+			return steps
+		}(),
+	})
+}
+
+func TestAccStep_invalid_assertion_comparison(t *testing.T) {
+	teamId := os.Getenv("RUNSCOPE_TEAM_ID")
+	bucketName := testAccRandomBucketName()
+	resource.Test(t, resource.TestCase{
+		PreCheck:          func() { testAccPreCheck(t) },
+		ProviderFactories: testAccProviderFactories,
+		CheckDestroy:      testAccCheckStepDestroy,
+		Steps: []resource.TestStep{
+			{
+				Config:      fmt.Sprintf(testAccStepAssertionComparisonsConfig, bucketName, teamId, "invalid_compatison"),
+				ExpectError: regexp.MustCompile("expected assertion.0.comparison to be one of"),
 			},
 		},
 	})
@@ -360,6 +469,90 @@ resource "runscope_step" "step" {
 }
 `
 
+const testAccStepVariableSourcesConfig = `
+resource "runscope_bucket" "bucket" {
+  name      = "%s"
+  team_uuid = "%s"
+}
+
+resource "runscope_test" "test" {
+  bucket_id   = runscope_bucket.bucket.id
+  name        = "runscope test"
+  description = "This is a test test..."
+}
+
+resource "runscope_step" "step" {
+  bucket_id = runscope_bucket.bucket.id
+  test_id   = runscope_test.test.id
+
+  step_type = "request"
+  method    = "GET"
+  url       = "https://example.org"
+
+  variable {
+    name     = "httpStatus"
+    source   = "%s"
+  }
+}
+`
+
+const testAccStepAssertionSourcesConfig = `
+resource "runscope_bucket" "bucket" {
+  name      = "%s"
+  team_uuid = "%s"
+}
+
+resource "runscope_test" "test" {
+  bucket_id   = runscope_bucket.bucket.id
+  name        = "runscope test"
+  description = "This is a test test..."
+}
+
+resource "runscope_step" "step" {
+  bucket_id = runscope_bucket.bucket.id
+  test_id   = runscope_test.test.id
+
+  step_type = "request"
+  method    = "GET"
+  url       = "https://example.org"
+
+  assertion {
+    source     = "%s"
+    comparison = "equal"
+    value      = "c5baeb4a-2379-478a-9cda-1b671de77cf9"
+    property   = "data.id"
+  }
+}
+`
+
+const testAccStepAssertionComparisonsConfig = `
+resource "runscope_bucket" "bucket" {
+  name      = "%s"
+  team_uuid = "%s"
+}
+
+resource "runscope_test" "test" {
+  bucket_id   = runscope_bucket.bucket.id
+  name        = "runscope test"
+  description = "This is a test test..."
+}
+
+resource "runscope_step" "step" {
+  bucket_id = runscope_bucket.bucket.id
+  test_id   = runscope_test.test.id
+
+  step_type = "request"
+  method    = "GET"
+  url       = "https://example.org"
+
+  assertion {
+    source     = "response_status"
+    comparison = "%s"
+    property   = "data.id"
+  }
+}
+`
+
 const testAccStepCustomConfig = `
 resource "runscope_bucket" "bucket" {
   name      = "%s"
@@ -387,7 +580,7 @@ resource "runscope_step" "step" {
 
   variable {
     name     = "httpContentEncoding"
-    source   = "response_header"
+    source   = "response_headers"
     property = "Content-Encoding"
   }
 
