@@ -7,7 +7,7 @@ type EnvironmentBase struct {
 	InitialVariables    map[string]string        `json:"initial_variables"`
 	Integrations        []EnvironmentIntegration `json:"integrations"`
 	Regions             []string                 `json:"regions"`
-	RemoteAgents        []RemoteAgent            `json:"remote_agents"`
+	RemoteAgents        []EnvironmentRemoteAgent `json:"remote_agents"`
 	RetryOnFailure      bool                     `json:"retry_on_failure"`
 	StopOnFailure       bool                     `json:"stop_on_failure"`
 	VerifySSL           bool                     `json:"verify_ssl"`
@@ -28,7 +28,7 @@ type EnvironmentIntegration struct {
 	Description     string `json:"description"`
 }
 
-type RemoteAgent struct {
+type EnvironmentRemoteAgent struct {
 	Name string `json:"name"`
 	UUID string `json:"uuid"`
 }

@@ -23,6 +23,7 @@ type Client struct {
 	Integration IntegrationClient
 	Schedule    ScheduleClient
 	Step        StepClient
+	RemoteAgent RemoteAgentClient
 }
 
 func NewClient(options ...ClientOption) *Client {
@@ -41,6 +42,7 @@ func NewClient(options ...ClientOption) *Client {
 	client.Integration = IntegrationClient{client: client}
 	client.Schedule = ScheduleClient{client: client}
 	client.Step = StepClient{client: client}
+	client.RemoteAgent = RemoteAgentClient{client: client}
 
 	return client
 }

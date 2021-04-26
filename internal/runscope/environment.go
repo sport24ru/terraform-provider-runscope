@@ -13,7 +13,7 @@ type EnvironmentBase struct {
 	InitialVariables    map[string]string
 	Integrations        []string
 	Regions             []string
-	RemoteAgents        []RemoteAgent
+	RemoteAgents        []EnvironmentRemoteAgent
 	RetryOnFailure      bool
 	StopOnFailure       bool
 	VerifySSL           bool
@@ -42,7 +42,7 @@ func (eb *EnvironmentBase) setRequest(seb *schema.EnvironmentBase) {
 		seb.Integrations = append(seb.Integrations, schema.EnvironmentIntegration{Id: id})
 	}
 	for _, agent := range eb.RemoteAgents {
-		seb.RemoteAgents = append(seb.RemoteAgents, schema.RemoteAgent{
+		seb.RemoteAgents = append(seb.RemoteAgents, schema.EnvironmentRemoteAgent{
 			Name: agent.Name,
 			UUID: agent.UUID,
 		})
@@ -64,7 +64,7 @@ type Environment struct {
 	Id string
 }
 
-type RemoteAgent struct {
+type EnvironmentRemoteAgent struct {
 	Name string
 	UUID string
 }
@@ -112,7 +112,7 @@ func EnvironmentFromSchema(s *schema.Environment) *Environment {
 		env.Integrations = append(env.Integrations, i.Id)
 	}
 	for _, ra := range s.RemoteAgents {
-		env.RemoteAgents = append(env.RemoteAgents, RemoteAgent{
+		env.RemoteAgents = append(env.RemoteAgents, EnvironmentRemoteAgent{
 			Name: ra.Name,
 			UUID: ra.UUID,
 		})

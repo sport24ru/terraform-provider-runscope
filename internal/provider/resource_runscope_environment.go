@@ -304,7 +304,7 @@ func expandEnvironmentBase(d *schema.ResourceData, opts *runscope.EnvironmentBas
 	if v, ok := d.GetOk("remote_agent"); ok {
 		for _, ra := range v.(*schema.Set).List() {
 			raa := ra.(map[string]interface{})
-			opts.RemoteAgents = append(opts.RemoteAgents, runscope.RemoteAgent{
+			opts.RemoteAgents = append(opts.RemoteAgents, runscope.EnvironmentRemoteAgent{
 				Name: raa["name"].(string),
 				UUID: raa["uuid"].(string),
 			})

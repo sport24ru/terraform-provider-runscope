@@ -153,3 +153,15 @@ func flattenCreatedBy(c *runscope.CreatedBy) []map[string]interface{} {
 		"email": c.Email,
 	}}
 }
+
+func flattenRemoteAgents(ra []*runscope.RemoteAgent) []map[string]interface{} {
+	remoteAgents := make([]map[string]interface{}, len(ra))
+	for i, r := range ra {
+		remoteAgents[i] = map[string]interface{}{
+			"id":      r.Id,
+			"name":    r.Name,
+			"version": r.Version,
+		}
+	}
+	return remoteAgents
+}
