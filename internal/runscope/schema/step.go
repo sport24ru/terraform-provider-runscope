@@ -1,5 +1,7 @@
 package schema
 
+import "encoding/json"
+
 type StepBase struct {
 	StepType      string              `json:"step_type"`
 	Method        string              `json:"method"`
@@ -14,6 +16,7 @@ type StepBase struct {
 	BeforeScripts []string            `json:"before_scripts"`
 	Note          string              `json:"note"`
 	Skipped       bool                `json:"skipped"`
+	Duration      int                 `json:"duration"`
 }
 
 type Step struct {

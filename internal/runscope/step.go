@@ -22,6 +22,7 @@ type StepBase struct {
 	BeforeScripts []string
 	Note          string
 	Skipped       bool
+	Duration      int
 }
 
 func (sb *StepBase) setFromSchema(s *schema.Step) {
@@ -42,6 +43,7 @@ func (sb *StepBase) setFromSchema(s *schema.Step) {
 	sb.BeforeScripts = make([]string, len(s.BeforeScripts))
 	sb.Note = s.Note
 	sb.Skipped = s.Skipped
+	sb.Duration = s.Duration
 
 	for i, v := range s.Variables {
 		sb.Variables[i] = StepVariable{
@@ -149,6 +151,7 @@ type StepBaseOpts struct {
 	BeforeScripts []string
 	Note          string
 	Skipped       bool
+	Duration      int
 }
 
 func (sbo *StepBaseOpts) setRequest(sb *schema.StepBase) {
@@ -169,6 +172,7 @@ func (sbo *StepBaseOpts) setRequest(sb *schema.StepBase) {
 	sb.BeforeScripts = make([]string, len(sbo.BeforeScripts))
 	sb.Note = sbo.Note
 	sb.Skipped = sbo.Skipped
+	sb.Duration = sbo.Duration
 
 	for i, v := range sbo.Variables {
 		sb.Variables[i] = schema.StepVariable{
