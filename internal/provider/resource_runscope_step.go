@@ -3,11 +3,12 @@ package provider
 import (
 	"context"
 	"fmt"
+	"strconv"
+	"strings"
+
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 	"github.com/terraform-providers/terraform-provider-runscope/internal/runscope"
-	"strconv"
-	"strings"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
@@ -303,7 +304,7 @@ func resourceStepUpdate(ctx context.Context, d *schema.ResourceData, meta interf
 
 	_, err := client.Step.Update(ctx, opts)
 	if err != nil {
-		return diag.Errorf("Couldn't create step: %s", err)
+		return diag.Errorf("Couldn't update step: %s", err)
 	}
 
 	return resourceStepRead(ctx, d, meta)
@@ -316,7 +317,7 @@ func resourceStepDelete(ctx context.Context, d *schema.ResourceData, meta interf
 	expandStepGetOpts(d, &opts.StepGetOpts)
 
 	if err := client.Step.Delete(ctx, opts); err != nil {
-		return diag.Errorf("Couldn't read step: %s", err)
+		return diag.Errorf("Couldn't delete step: %s", err)
 	}
 
 	return nil
