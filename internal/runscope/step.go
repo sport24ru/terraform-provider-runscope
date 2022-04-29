@@ -2,7 +2,9 @@ package runscope
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+
 	"github.com/terraform-providers/terraform-provider-runscope/internal/runscope/schema"
 )
 
@@ -20,6 +22,7 @@ type StepBase struct {
 	BeforeScripts []string
 	Note          string
 	Skipped       bool
+	Duration      int
 }
 
 func (sb *StepBase) setFromSchema(s *schema.Step) {
@@ -40,6 +43,7 @@ func (sb *StepBase) setFromSchema(s *schema.Step) {
 	sb.BeforeScripts = make([]string, len(s.BeforeScripts))
 	sb.Note = s.Note
 	sb.Skipped = s.Skipped
+	sb.Duration = s.Duration
 
 	for i, v := range s.Variables {
 		sb.Variables[i] = StepVariable{
@@ -49,11 +53,18 @@ func (sb *StepBase) setFromSchema(s *schema.Step) {
 		}
 	}
 	for i, a := range s.Assertions {
+		var value string
+		if len(a.Value) > 1 && a.Value[0] == '"' && a.Value[len(a.Value)-1] == '"' {
+			value = string(a.Value[1 : len(a.Value)-1])
+		} else {
+			value = string(a.Value)
+		}
+
 		sb.Assertions[i] = StepAssertion{
 			Source:     a.Source,
 			Property:   a.Property,
 			Comparison: a.Comparison,
-			Value:      a.Value,
+			Value:      value,
 		}
 	}
 	for header, values := range s.Headers {
@@ -140,6 +151,7 @@ type StepBaseOpts struct {
 	BeforeScripts []string
 	Note          string
 	Skipped       bool
+	Duration      int
 }
 
 func (sbo *StepBaseOpts) setRequest(sb *schema.StepBase) {
@@ -160,6 +172,7 @@ func (sbo *StepBaseOpts) setRequest(sb *schema.StepBase) {
 	sb.BeforeScripts = make([]string, len(sbo.BeforeScripts))
 	sb.Note = sbo.Note
 	sb.Skipped = sbo.Skipped
+	sb.Duration = sbo.Duration
 
 	for i, v := range sbo.Variables {
 		sb.Variables[i] = schema.StepVariable{
@@ -172,7 +185,7 @@ func (sbo *StepBaseOpts) setRequest(sb *schema.StepBase) {
 		sb.Assertions[i] = schema.StepAssertion{
 			Source:     a.Source,
 			Comparison: a.Comparison,
-			Value:      a.Value,
+			Value:      (json.RawMessage)(string('"') + string(a.Value) + string('"')),
 			Property:   a.Property,
 		}
 	}

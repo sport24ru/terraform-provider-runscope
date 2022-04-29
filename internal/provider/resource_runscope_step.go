@@ -3,11 +3,12 @@ package provider
 import (
 	"context"
 	"fmt"
+	"strconv"
+	"strings"
+
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 	"github.com/terraform-providers/terraform-provider-runscope/internal/runscope"
-	"strconv"
-	"strings"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
@@ -109,11 +110,11 @@ func resourceRunscopeStep() *schema.Resource {
 			},
 			"method": {
 				Type:     schema.TypeString,
-				Required: true,
+				Optional: true, // FIXME: this is required if the step_type is request
 			},
 			"url": {
 				Type:     schema.TypeString,
-				Required: true,
+				Optional: true, // FIXME: this is required if the step_type is request
 			},
 			"variable": {
 				Type: schema.TypeSet,
@@ -236,6 +237,11 @@ func resourceRunscopeStep() *schema.Resource {
 				Type:     schema.TypeBool,
 				Optional: true,
 			},
+			"duration": {
+				Type:         schema.TypeInt,
+				Optional:     true,
+				ValidateFunc: validation.IntBetween(0, 180),
+			},
 		},
 	}
 }
@@ -290,6 +296,7 @@ func resourceStepRead(ctx context.Context, d *schema.ResourceData, meta interfac
 	d.Set("before_scripts", step.BeforeScripts)
 	d.Set("note", step.Note)
 	d.Set("skipped", step.Skipped)
+	d.Set("duration", step.Duration)
 
 	return nil
 }
@@ -303,7 +310,7 @@ func resourceStepUpdate(ctx context.Context, d *schema.ResourceData, meta interf
 
 	_, err := client.Step.Update(ctx, opts)
 	if err != nil {
-		return diag.Errorf("Couldn't create step: %s", err)
+		return diag.Errorf("Couldn't update step: %s", err)
 	}
 
 	return resourceStepRead(ctx, d, meta)
@@ -316,7 +323,7 @@ func resourceStepDelete(ctx context.Context, d *schema.ResourceData, meta interf
 	expandStepGetOpts(d, &opts.StepGetOpts)
 
 	if err := client.Step.Delete(ctx, opts); err != nil {
-		return diag.Errorf("Couldn't read step: %s", err)
+		return diag.Errorf("Couldn't delete step: %s", err)
 	}
 
 	return nil
@@ -369,5 +376,8 @@ func expandStepBaseOpts(d *schema.ResourceData, opts *runscope.StepBaseOpts) {
 	}
 	if v, ok := d.GetOk("skipped"); ok {
 		opts.Skipped = v.(bool)
+	}
+	if v, ok := d.GetOk("duration"); ok {
+		opts.Duration = v.(int)
 	}
 }
