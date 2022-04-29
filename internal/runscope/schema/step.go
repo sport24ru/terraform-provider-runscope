@@ -28,10 +28,10 @@ type StepVariable struct {
 }
 
 type StepAssertion struct {
-	Source     string `json:"source"`
-	Property   string `json:"property"`
-	Comparison string `json:"comparison"`
-	Value      string `json:"value"`
+	Source     string          `json:"source"`
+	Property   string          `json:"property"`
+	Comparison string          `json:"comparison"`
+	Value      json.RawMessage `json:"value"`
 }
 
 type StepAuth struct {

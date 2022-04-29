@@ -2,7 +2,9 @@ package runscope
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+
 	"github.com/terraform-providers/terraform-provider-runscope/internal/runscope/schema"
 )
 
@@ -49,11 +51,18 @@ func (sb *StepBase) setFromSchema(s *schema.Step) {
 		}
 	}
 	for i, a := range s.Assertions {
+		var value string
+		if len(a.Value) > 1 && a.Value[0] == '"' && a.Value[len(a.Value)-1] == '"' {
+			value = string(a.Value[1 : len(a.Value)-1])
+		} else {
+			value = string(a.Value)
+		}
+
 		sb.Assertions[i] = StepAssertion{
 			Source:     a.Source,
 			Property:   a.Property,
 			Comparison: a.Comparison,
-			Value:      a.Value,
+			Value:      value,
 		}
 	}
 	for header, values := range s.Headers {
@@ -172,7 +181,7 @@ func (sbo *StepBaseOpts) setRequest(sb *schema.StepBase) {
 		sb.Assertions[i] = schema.StepAssertion{
 			Source:     a.Source,
 			Comparison: a.Comparison,
-			Value:      a.Value,
+			Value:      (json.RawMessage)(string('"') + string(a.Value) + string('"')),
 			Property:   a.Property,
 		}
 	}
