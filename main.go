@@ -2,7 +2,7 @@ package main
 
 import (
 	"github.com/hashicorp/terraform-plugin-sdk/v2/plugin"
-	"github.com/terraform-providers/terraform-provider-runscope/internal/provider"
+	"github.com/terraform-providers/tubi-terraform-provider-runscope/internal/provider"
 )
 
 func main() {
