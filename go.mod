@@ -1,4 +1,4 @@
-module github.com/terraform-providers/terraform-provider-runscope
+module github.com/adRise/tubi-terraform-provider-runscope
 
 go 1.15
 

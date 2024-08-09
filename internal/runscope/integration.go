@@ -3,7 +3,8 @@ package runscope
 import (
 	"context"
 	"fmt"
-	"github.com/terraform-providers/terraform-provider-runscope/internal/runscope/schema"
+
+	"github.com/adRise/tubi-terraform-provider-runscope/internal/runscope/schema"
 )
 
 type Integration struct {

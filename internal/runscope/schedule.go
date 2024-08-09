@@ -3,8 +3,9 @@ package runscope
 import (
 	"context"
 	"fmt"
-	"github.com/terraform-providers/terraform-provider-runscope/internal/runscope/schema"
 	"time"
+
+	"github.com/adRise/tubi-terraform-provider-runscope/internal/runscope/schema"
 )
 
 type ScheduleBase struct {

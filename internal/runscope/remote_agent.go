@@ -3,7 +3,8 @@ package runscope
 import (
 	"context"
 	"fmt"
-	"github.com/terraform-providers/terraform-provider-runscope/internal/runscope/schema"
+
+	"github.com/adRise/tubi-terraform-provider-runscope/internal/runscope/schema"
 )
 
 type RemoteAgent struct {
@@ -31,7 +32,6 @@ type RemoteAgentListOpts struct {
 // URL returns an URL of agents list request
 //
 // See https://api.blazemeter.com/api-monitoring/#team-agents-list
-//
 func (opts *RemoteAgentListOpts) URL() string {
 	return fmt.Sprintf("/teams/%s/agents", opts.TeamUUID)
 }
@@ -39,7 +39,6 @@ func (opts *RemoteAgentListOpts) URL() string {
 // List returns a list of the team’s currently connected agents.
 //
 // See https://api.blazemeter.com/api-monitoring/#team-agents-list
-//
 func (c *RemoteAgentClient) List(ctx context.Context, opts *RemoteAgentListOpts) ([]*RemoteAgent, error) {
 	req, err := c.client.NewRequest(ctx, "GET", opts.URL(), nil)
 	if err != nil {

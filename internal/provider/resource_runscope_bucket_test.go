@@ -3,10 +3,11 @@ package provider
 import (
 	"context"
 	"fmt"
-	"github.com/terraform-providers/terraform-provider-runscope/internal/runscope"
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/adRise/tubi-terraform-provider-runscope/internal/runscope"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/terraform"

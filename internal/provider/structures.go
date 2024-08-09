@@ -1,8 +1,9 @@
 package provider
 
 import (
-	"github.com/terraform-providers/terraform-provider-runscope/internal/runscope"
 	"time"
+
+	"github.com/adRise/tubi-terraform-provider-runscope/internal/runscope"
 )
 
 func expandStringSlice(s []interface{}) []string {

@@ -6,9 +6,10 @@ package provider
 import (
 	"context"
 	"fmt"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
-	"github.com/terraform-providers/terraform-provider-runscope/internal/runscope"
 	"strings"
+
+	"github.com/adRise/tubi-terraform-provider-runscope/internal/runscope"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
