@@ -1,3 +1,5 @@
+version: 2
+
 before:
   hooks:
     - go mod tidy
@@ -5,18 +7,11 @@ builds:
   - env:
       - CGO_ENABLED=0
     goos:
-      - freebsd
-      - windows
       - linux
       - darwin
     goarch:
       - amd64
-      - '386'
-      - arm
       - arm64
-    ignore:
-      - goos: darwin
-        goarch: '386'
     binary: '{{ .ProjectName }}_v{{ .Version }}'
 archives:
   - format: zip
@@ -24,17 +19,17 @@ archives:
 checksum:
   name_template: '{{ .ProjectName }}_{{ .Version }}_SHA256SUMS'
   algorithm: sha256
-signs:
-  - artifacts: checksum
-    args:
-      - "--local-user"
-      - "1B52E5F9EAF44E52A1E0A46FB53CC3B2CF6AD460" # Replace this with your GPG signing key ID
-      - "--output"
-      - "${signature}"
-      - "--detach-sign"
-      - "${artifact}"
+# signs:
+#   - artifacts: checksum
+#     args:
+#       - "--local-user"
+#       - "1B52E5F9EAF44E52A1E0A46FB53CC3B2CF6AD460" # Replace this with your GPG signing key ID
+#       - "--output"
+#       - "${signature}"
+#       - "--detach-sign"
+#       - "${artifact}"
 release:
   # Visit your project's GitHub Releases page to publish this release.
   draft: true
-changelog:
-  skip: true
+# changelog:
+#    skip: true
